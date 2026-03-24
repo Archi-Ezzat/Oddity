@@ -17,7 +17,7 @@
     "path": "downloads/assets/models/clip/t5xxl_fp16.safetensors",
     "downloadUrl": "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true",
     "sourceUrl": "https://huggingface.co/comfyanonymous/flux_text_encoders",
-    "notes": "Used by the backend for the FLUX T5 encoder path."
+    "notes": "Used by the backend for the FLUX T5 encoder path. This is the correct single-file download for Oddity; the google/flan-t5-xxl repo is sharded into multiple safetensors files and is not the one-file asset this backend expects."
   },
   {
     "id": "flux_ae",
@@ -25,9 +25,9 @@
     "required": true,
     "kind": "file",
     "path": "downloads/assets/models/vae/ae.safetensors",
-    "downloadUrl": "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true",
-    "sourceUrl": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
-    "notes": "Required VAE file."
+    "downloadUrl": "https://huggingface.co/StableDiffusionVN/Flux/resolve/main/Vae/flux_vae.safetensors?download=true",
+    "sourceUrl": "https://huggingface.co/StableDiffusionVN/Flux/blob/main/Vae/flux_vae.safetensors",
+    "notes": "Required VAE file. Saved locally as ae.safetensors so the backend can use it without extra renaming."
   },
   {
     "id": "transformer_dir",
@@ -48,8 +48,8 @@
     "kind": "file",
     "path": "downloads/assets/models/unet/flux/flux-2-klein-9b.safetensors",
     "downloadUrl": null,
-    "sourceUrl": "",
-    "notes": "Optional local model currently present on the original machine. Add the source URL once you confirm it."
+    "sourceUrl": "https://huggingface.co/black-forest-labs/FLUX.2-klein-9B/blob/main/flux-2-klein-9b.safetensors",
+    "notes": "Optional local model currently present on the original machine. Official Black Forest Labs single-file checkpoint."
   },
   {
     "id": "flux1_fill_dev",
