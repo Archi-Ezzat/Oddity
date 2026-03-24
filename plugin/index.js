@@ -10,16 +10,14 @@ const STORAGE_KEYS = {
 };
 
 const MODE_CONFIG = {
-  generate: { label: "Generate", usesCanvas: false, modeBadge: "TXT", canvasLabel: "No active selection" },
-  img2img: { label: "Remix", usesCanvas: true, modeBadge: "IMG", canvasLabel: "Active document is source" },
-  inpaint: { label: "Inpaint", usesCanvas: true, modeBadge: "MASK", canvasLabel: "Use the active selection as your repair guide" },
+  generate: { label: "Generate", usesCanvas: true, modeBadge: "FILL", canvasLabel: "Use the active selection as your generative fill guide" },
+  inpaint: { label: "Inpaint", usesCanvas: true, modeBadge: "MASK", canvasLabel: "Repair details inside the active selection" },
   outpaint: { label: "Expand", usesCanvas: true, modeBadge: "EXP", canvasLabel: "Expand the Photoshop canvas before generating" },
 };
 
 const dom = {};
 const state = {
   currentMode: "generate",
-  sourceMode: "txt2img",
   compareMode: "after",
   isGenerating: false,
   modelReady: false,
@@ -63,8 +61,6 @@ function bindDom() {
     activePromptCard: $("activePromptCard"),
     activePromptText: $("activePromptText"),
     promptInput: $("promptInput"),
-    chipImg2Img: $("chipImg2Img"),
-    chipTxt2Img: $("chipTxt2Img"),
     charCount: $("charCount"),
     progressArea: $("progressArea"),
     progressPct: $("progressPct"),
@@ -155,9 +151,6 @@ function getPromptValue() {
 }
 
 function getEffectiveMode() {
-  if (state.currentMode === "generate") {
-    return state.sourceMode === "img2img" ? "img2img" : "generate";
-  }
   return state.currentMode;
 }
 
@@ -203,25 +196,17 @@ function updateTabState() {
   dom.tabExpand.classList.toggle("active", state.currentMode === "outpaint");
 }
 
-function updateChipState() {
-  const forcedCanvasMode = state.currentMode !== "generate";
-  dom.chipImg2Img.classList.toggle("active", forcedCanvasMode || state.sourceMode === "img2img");
-  dom.chipTxt2Img.classList.toggle("active", !forcedCanvasMode && state.sourceMode === "txt2img");
-  dom.chipTxt2Img.classList.toggle("is-disabled", forcedCanvasMode);
-}
-
 function updateModeUI() {
   const mode = getEffectiveMode();
   const usesCanvas = MODE_CONFIG[mode].usesCanvas;
   dom.body.dataset.mode = mode;
   updateTabState();
-  updateChipState();
   dom.modeBadge.textContent = MODE_CONFIG[mode].modeBadge;
   dom.canvasLabel.textContent = MODE_CONFIG[mode].canvasLabel;
 
-  dom.settingStrength.disabled = mode === "generate";
-  dom.strengthCard.classList.toggle("is-disabled", mode === "generate");
-  dom.strengthHint.textContent = mode === "generate" ? "Inactive" : "Denoising";
+  dom.settingStrength.disabled = false;
+  dom.strengthCard.classList.remove("is-disabled");
+  dom.strengthHint.textContent = mode === "outpaint" ? "Blend" : "Denoising";
 
   dom.settingResolution.disabled = usesCanvas;
   dom.resolutionCard.classList.toggle("is-disabled", usesCanvas);
@@ -277,7 +262,6 @@ function renderHistory() {
 
 function restoreHistory(entry) {
   state.currentMode = entry.tabMode || entry.mode;
-  state.sourceMode = entry.sourceMode || (entry.mode === "generate" ? "txt2img" : "img2img");
   dom.promptInput.value = entry.prompt || "";
   dom.settingStrength.value = String(entry.strength || 72);
   dom.settingGuidance.value = String(entry.guidance || 75);
@@ -311,7 +295,6 @@ function pushHistory(result, seed, width, height) {
     prompt: getPromptValue().trim(),
     mode: getEffectiveMode(),
     tabMode: state.currentMode,
-    sourceMode: state.sourceMode,
     seed,
     width,
     height,
@@ -672,9 +655,6 @@ async function applyResult() {
 
 function setCurrentMode(mode) {
   state.currentMode = mode;
-  if (mode !== "generate") {
-    state.sourceMode = "img2img";
-  }
   updateModeUI();
 }
 
@@ -695,17 +675,6 @@ function initEvents() {
       event.preventDefault();
       runGeneration();
     }
-  });
-
-  dom.chipImg2Img.addEventListener("click", () => {
-    if (state.currentMode !== "generate") return;
-    state.sourceMode = "img2img";
-    updateModeUI();
-  });
-  dom.chipTxt2Img.addEventListener("click", () => {
-    if (state.currentMode !== "generate") return;
-    state.sourceMode = "txt2img";
-    updateModeUI();
   });
 
   dom.tabGenerate.addEventListener("click", () => setCurrentMode("generate"));
