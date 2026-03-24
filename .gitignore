@@ -1,4 +1,4 @@
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -12,6 +12,7 @@ venv/
 
 # Local assets and large model files
 downloads/assets/
+downloads/CHECKLIST.generated.md
 backend/assets.local.json
 *.safetensors
 *.ckpt
@@ -25,6 +26,7 @@ backend/assets.local.json
 *.crdownload
 
 # Local mirrors and machine-specific output
+Claude/
 Oddity/
 PhotoshopBanana/
 
