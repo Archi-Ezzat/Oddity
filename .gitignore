@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual environments
+backend/venv/
+.venv/
+venv/
+
+# Local assets and large model files
+downloads/assets/
+backend/assets.local.json
+*.safetensors
+*.ckpt
+*.bin
+*.pt
+*.pth
+
+# Build and package artifacts
+*.zip
+*.ccx
+*.crdownload
+
+# Local mirrors and machine-specific output
+Oddity/
+PhotoshopBanana/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

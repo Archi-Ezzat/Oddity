@@ -1,0 +1,94 @@
+[
+  {
+    "id": "clip_l",
+    "name": "CLIP-L text encoder",
+    "required": true,
+    "kind": "file",
+    "path": "downloads/assets/models/clip/clip_l.safetensors",
+    "downloadUrl": "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true",
+    "sourceUrl": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+    "notes": "Used by the backend for the FLUX text encoder path."
+  },
+  {
+    "id": "t5xxl_fp16",
+    "name": "T5 XXL FP16 text encoder",
+    "required": true,
+    "kind": "file",
+    "path": "downloads/assets/models/clip/t5xxl_fp16.safetensors",
+    "downloadUrl": "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors?download=true",
+    "sourceUrl": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+    "notes": "Used by the backend for the FLUX T5 encoder path."
+  },
+  {
+    "id": "flux_ae",
+    "name": "FLUX autoencoder",
+    "required": true,
+    "kind": "file",
+    "path": "downloads/assets/models/vae/ae.safetensors",
+    "downloadUrl": "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true",
+    "sourceUrl": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
+    "notes": "Required VAE file."
+  },
+  {
+    "id": "transformer_dir",
+    "name": "Oddity transformer weights directory",
+    "required": true,
+    "kind": "directory_glob",
+    "path": "downloads/assets/models/unet/flux",
+    "glob": "*.safetensors",
+    "minCount": 1,
+    "downloadUrl": null,
+    "sourceUrl": "https://huggingface.co/Shakker-Labs/AWPortrait-FL",
+    "notes": "Add at least one compatible transformer weight file here."
+  },
+  {
+    "id": "flux_2_klein_9b",
+    "name": "flux-2-klein-9b.safetensors",
+    "required": false,
+    "kind": "file",
+    "path": "downloads/assets/models/unet/flux/flux-2-klein-9b.safetensors",
+    "downloadUrl": null,
+    "sourceUrl": "",
+    "notes": "Optional local model currently present on the original machine. Add the source URL once you confirm it."
+  },
+  {
+    "id": "flux1_fill_dev",
+    "name": "flux1-fill-dev.safetensors",
+    "required": false,
+    "kind": "file",
+    "path": "downloads/assets/models/unet/flux/flux1-fill-dev.safetensors",
+    "downloadUrl": null,
+    "sourceUrl": "https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev",
+    "notes": "Optional model."
+  },
+  {
+    "id": "flux1_krea_dev",
+    "name": "flux1-krea-dev.safetensors",
+    "required": false,
+    "kind": "file",
+    "path": "downloads/assets/models/unet/flux/flux1-krea-dev.safetensors",
+    "downloadUrl": null,
+    "sourceUrl": "",
+    "notes": "Optional model. Add the exact source URL if you need this model on another machine."
+  },
+  {
+    "id": "flux_dev_new",
+    "name": "flux_dev_new.safetensors",
+    "required": false,
+    "kind": "file",
+    "path": "downloads/assets/models/unet/flux/flux_dev_new.safetensors",
+    "downloadUrl": null,
+    "sourceUrl": "",
+    "notes": "Optional local model."
+  },
+  {
+    "id": "nunchaku_flux_int4_dev",
+    "name": "nunchaku-flux.1-int4-dev.safetensors",
+    "required": false,
+    "kind": "file",
+    "path": "downloads/assets/models/unet/flux/nunchaku-flux.1-int4-dev.safetensors",
+    "downloadUrl": null,
+    "sourceUrl": "",
+    "notes": "Optional local model."
+  }
+]

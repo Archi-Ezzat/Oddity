@@ -1,0 +1,72 @@
+{
+  "name": "Oddity",
+  "id": "com.oddity.fluxsrpo",
+  "version": "1.0.0",
+  "main": "index.html",
+  "manifestVersion": 5,
+  "host": {
+    "app": "PS",
+    "minVersion": "25.0.0",
+    "data": {
+      "apiVersion": 2,
+      "loadEvent": "use"
+    }
+  },
+  "requiredPermissions": {
+    "network": {
+      "domains": [
+        "http://127.0.0.1:5000",
+        "http://localhost:5000",
+        "http://127.0.0.1",
+        "http://localhost"
+      ]
+    },
+    "localFileSystem": "fullAccess",
+    "clipboard": "readAndWrite",
+    "launchProcess": {
+      "schemes": [],
+      "extensions": []
+    }
+  },
+  "icons": [
+    {
+      "width": 24,
+      "height": 24,
+      "path": "icons/icon_24.png",
+      "scale": [1],
+      "theme": ["all"]
+    },
+    {
+      "width": 24,
+      "height": 24,
+      "path": "icons/icon_48.png",
+      "scale": [2],
+      "theme": ["all"]
+    }
+  ],
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "oddity-panel",
+      "label": {
+        "default": "Oddity AI"
+      },
+      "minimumSize": {
+        "width": 240,
+        "height": 400
+      },
+      "maximumSize": {
+        "width": 600,
+        "height": 2000
+      },
+      "preferredDockedSize": {
+        "width": 320,
+        "height": 560
+      },
+      "preferredFloatingSize": {
+        "width": 480,
+        "height": 600
+      }
+    }
+  ]
+}
