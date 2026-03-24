@@ -27,21 +27,43 @@ Oddity is designed for artists and retouchers who want modern AI editing inside 
 - `backend/` local FastAPI inference server
 - `downloads/` asset manifest, checklist generator, and source links for another machine
 - `bootstrap.bat` guided local setup entry point
+- `install_plugin.bat` direct Windows installer for Photoshop
 
 ## Installation
 
-### End-User Installation
+### Recommended User Installation
 
-End users should not need Adobe UXP Developer Tool.
+You do not need Adobe UXP Developer Tool to use Oddity from this project folder.
 
-The recommended release format is a packaged Photoshop UXP `.ccx` installer:
+1. Close Photoshop.
+2. Run `install_plugin.bat` as Administrator.
+3. Run `setup.bat` if the machine is not prepared yet.
+4. Run:
 
-1. Download the released `Oddity.ccx` package.
-2. Double-click the `.ccx` file.
-3. Let Adobe Creative Cloud install the plugin.
-4. Open Photoshop 2025 and launch Oddity from the Plugins menu.
+```powershell
+powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1
+```
 
-This is the simplest supported distribution path for private sharing outside the Adobe Marketplace.
+Optional supported downloads:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1 -DownloadMissing
+```
+
+5. Start the local backend:
+
+```powershell
+start_server.bat
+```
+
+6. Open Photoshop 2025.
+7. Launch Oddity from `Plugins > Oddity AI`.
+
+This is currently the simplest reliable user flow.
+
+### Optional Packaged Installation
+
+A `.ccx` package is still a valid release format, but it must be freshly packaged from the current plugin source. Renaming an old `.ccx` file does not update the plugin name or id inside Adobe.
 
 ### Developer Installation
 
@@ -59,27 +81,11 @@ setup.bat
 powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1
 ```
 
-Optional supported downloads:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1 -DownloadMissing
-```
-
-Oddity expects local assets under:
-
-```text
-downloads/assets/models/clip/
-downloads/assets/models/vae/
-downloads/assets/models/unet/flux/
-```
-
 3. Start the local backend:
 
 ```powershell
 start_server.bat
 ```
-
-The server listens on `127.0.0.1:5000` by default.
 
 4. Load the panel from source with Adobe UXP Developer Tool:
 
@@ -98,12 +104,13 @@ The bootstrap flow creates the Python environment, checks the asset manifest, an
 
 ## Distribution
 
-Oddity has two practical distribution modes:
+Oddity has three practical distribution modes:
 
+- direct plugin-folder installation through `install_plugin.bat`
 - `.ccx` direct distribution for private users and testing
 - Adobe Creative Cloud Marketplace for public release and update management
 
-For this project, the simplest user-facing path is direct `.ccx` distribution. UXP Developer Tool is only needed by the developer to package or debug the plugin, not by the user who installs it.
+Right now, the simplest user-facing path is `install_plugin.bat` plus the local backend setup.
 
 ## Positioning
 
