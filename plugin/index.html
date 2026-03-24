@@ -1,293 +1,183 @@
-<!DOCTYPE html>
-<html>
+﻿<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flux Atelier</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
 </head>
-<body data-status="offline" data-mode="generate" data-width="standard">
-  <div class="app-shell">
-    <header class="panel-header">
-      <div class="brand-block">
-        <div class="brand-mark">OD</div>
-        <div class="brand-copy">
-          <div class="brand-eyebrow">Photoshop 2025 UXP</div>
-          <div class="brand-title-row">
-            <h1>Oddity</h1>
-            <span class="privacy-badge">Local / Private</span>
-          </div>
-        </div>
+<body data-status="offline" data-mode="generate" data-compare="after">
+<div class="panel">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-mark" id="logoMark"></div>
+      <div>
+        <div class="logo-text">Flux Atelier</div>
+        <div class="logo-sub" id="logoSub">SRPO · bf16</div>
       </div>
-
-      <div class="header-actions">
-        <button class="icon-button" id="togglePresetBtn" type="button" aria-expanded="true" title="Toggle presets">PR</button>
-        <button class="icon-button" id="toggleHistoryBtn" type="button" aria-expanded="false" title="Toggle history">HS</button>
-      </div>
-    </header>
-
-    <section class="top-strip card">
-      <div class="status-cluster">
-        <div>
-          <div class="section-kicker">Engine</div>
-          <div class="status-row">
-            <span class="status-pill offline" id="statusPill">Offline</span>
-            <p class="status-narrative" id="statusNarrative">Waiting for the local server to respond.</p>
-          </div>
-        </div>
-
-        <button class="icon-button" id="toggleSettingsBtn" type="button" aria-expanded="false" title="Toggle parameters">PX</button>
-      </div>
-
-      <div class="status-grid">
-        <label class="field compact">
-          <span class="field-label">Model</span>
-          <select class="field-control field-select" id="settingModel">
-            <option value="">Loading models...</option>
-          </select>
-        </label>
-
-        <div class="telemetry-tile">
-          <span class="field-label">VRAM</span>
-          <strong id="gpuInfo">--</strong>
-        </div>
-
-        <div class="telemetry-tile">
-          <span class="field-label">Queue</span>
-          <strong id="queueValue">Idle</strong>
-        </div>
-
-        <label class="field compact">
-          <span class="field-label">Route</span>
-          <select class="field-control field-select" id="layerRouting">
-            <option value="new_layer">New Layer</option>
-            <option value="replace_canvas">Replace Canvas</option>
-            <option value="new_mask">Mask Review Layer</option>
-          </select>
-        </label>
-      </div>
-    </section>
-
-    <section class="mode-strip card" aria-label="Generation modes">
-      <button class="mode-chip active" id="modeGenerate" data-mode="generate" type="button">Create</button>
-      <button class="mode-chip" id="modeInpaint" data-mode="inpaint" type="button">Inpaint</button>
-      <button class="mode-chip" id="modeOutpaint" data-mode="outpaint" type="button">Expand</button>
-      <button class="mode-chip" id="modeEdit" data-mode="img2img" type="button">Remix</button>
-    </section>
-
-    <main class="panel-body">
-      <section class="composer-card card">
-        <div class="card-head">
-          <div>
-            <div class="section-kicker">Prompt</div>
-            <h2 id="modeTitle">Fresh scene</h2>
-          </div>
-
-          <div class="char-meter">
-            <span id="charCount">0</span>
-            <span class="char-divider">/</span>
-            600
-          </div>
-        </div>
-
-        <textarea
-          class="prompt-area"
-          id="promptInput"
-          maxlength="600"
-          spellcheck="false"
-          placeholder="Describe the composition, atmosphere, lens language, and edits you want."
-        ></textarea>
-
-        <div class="prompt-meta">
-          <p class="prompt-context" id="contextNote">Text-to-image can create on a new layer or replace the current canvas.</p>
-          <button class="text-button" id="clearPromptBtn" type="button">Clear</button>
-        </div>
-
-        <div class="suggestion-row" id="suggestionRow"></div>
-      </section>
-
-      <section class="stage-card card">
-        <div class="card-head">
-          <div>
-            <div class="section-kicker">Output</div>
-            <h2>Review surface</h2>
-          </div>
-
-          <div class="compare-switch">
-            <button class="compare-chip active" id="compareSplitBtn" data-compare="split" type="button">Split</button>
-            <button class="compare-chip" id="compareBeforeBtn" data-compare="before" type="button">Before</button>
-            <button class="compare-chip" id="compareAfterBtn" data-compare="after" type="button">After</button>
-          </div>
-        </div>
-
-        <div class="stage-layout">
-          <div class="stage-frame" id="compareFrame" data-compare="after">
-            <div class="stage-empty" id="previewPlaceholder">
-              <div class="empty-badge" id="emptyBadge">Local render</div>
-              <p class="empty-headline" id="emptyHeadline">Compose a prompt to begin.</p>
-              <p class="empty-detail" id="emptyDetail">The panel keeps previews and generation controls inside Photoshop while FLUX runs on your machine.</p>
-            </div>
-
-            <div class="stage-layer before-layer">
-              <img id="beforeImage" alt="Source preview" />
-            </div>
-
-            <div class="stage-layer after-layer">
-              <img id="previewImage" alt="Generated preview" />
-            </div>
-
-            <input class="compare-slider" id="compareSlider" type="range" min="0" max="100" value="54" />
-            <div class="compare-handle" id="compareHandle"></div>
-
-            <div class="frame-caption">
-              <span id="frameStatus">Awaiting render</span>
-              <span id="seedEcho">Seed auto</span>
-            </div>
-          </div>
-
-          <div class="story-panel" id="storyPanel">
-            <div class="story-orbit">
-              <div class="orbit-ring orbit-ring-a"></div>
-              <div class="orbit-ring orbit-ring-b"></div>
-              <div class="orbit-ring orbit-ring-c"></div>
-              <div class="orbit-core">
-                <span id="storyPercent">0%</span>
-              </div>
-            </div>
-
-            <div class="story-copy">
-              <div class="story-label" id="storyLabel">Ready</div>
-              <div class="story-line" id="progressText">Local model standing by.</div>
-            </div>
-
-            <div class="story-steps">
-              <div class="story-node is-active" id="storyNodeBrief">
-                <span class="node-dot"></span>
-                <span>Brief</span>
-              </div>
-              <div class="story-node" id="storyNodeSample">
-                <span class="node-dot"></span>
-                <span>Sample</span>
-              </div>
-              <div class="story-node" id="storyNodeRefine">
-                <span class="node-dot"></span>
-                <span>Refine</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="action-bar">
-          <button class="primary-action" id="generateBtn" type="button" disabled>
-            <span class="action-label" id="generateLabel">Generate</span>
-            <span class="action-caption" id="generateCaption">Ctrl/Cmd + Enter</span>
-          </button>
-
-          <button class="secondary-action" id="applyBtn" type="button" disabled>Apply result</button>
-        </div>
-      </section>
-
-      <div class="drawer-stack">
-        <section class="drawer card is-open" id="presetDrawer">
-          <button class="drawer-toggle" id="togglePresetDrawer" type="button" aria-expanded="true">
-            <div>
-              <div class="section-kicker">Presets</div>
-              <h2>Looks</h2>
-            </div>
-            <span class="drawer-state">Open</span>
-          </button>
-
-          <div class="drawer-body">
-            <div class="preset-grid" id="presetList"></div>
-            <button class="tertiary-action" id="savePresetBtn" type="button">Save current preset</button>
-          </div>
-        </section>
-
-        <section class="drawer card" id="settingsDrawer">
-          <button class="drawer-toggle" id="toggleSettingsDrawer" type="button" aria-expanded="false">
-            <div>
-              <div class="section-kicker">Parameters</div>
-              <h2>Sampling controls</h2>
-            </div>
-            <span class="drawer-state">Closed</span>
-          </button>
-
-          <div class="drawer-body">
-            <div class="settings-grid">
-              <label class="field" id="widthField">
-                <span class="field-label">Width</span>
-                <input class="field-control" id="settingWidth" type="number" value="1024" min="256" max="2048" step="64" />
-              </label>
-
-              <label class="field" id="heightField">
-                <span class="field-label">Height</span>
-                <input class="field-control" id="settingHeight" type="number" value="1024" min="256" max="2048" step="64" />
-              </label>
-
-              <label class="field">
-                <span class="field-label">Steps</span>
-                <input class="field-control" id="settingSteps" type="number" value="20" min="1" max="50" step="1" />
-              </label>
-
-              <label class="field">
-                <span class="field-label">Seed</span>
-                <input class="field-control" id="settingSeed" type="number" value="-1" min="-1" />
-              </label>
-
-              <div class="field field-span">
-                <div class="slider-head">
-                  <span class="field-label">Guidance scale</span>
-                  <span class="slider-value" id="guidanceValue">3.5</span>
-                </div>
-                <input class="field-slider" id="settingGuidance" type="range" min="1" max="20" step="0.5" value="3.5" />
-                <div class="slider-hints">
-                  <span>Loose</span>
-                  <span>Balanced</span>
-                  <span>Literal</span>
-                </div>
-              </div>
-
-              <div class="field field-span" id="strengthField">
-                <div class="slider-head">
-                  <span class="field-label">Transform strength</span>
-                  <span class="slider-value" id="strengthValue">0.75</span>
-                </div>
-                <input class="field-slider" id="settingStrength" type="range" min="0.05" max="1.0" step="0.05" value="0.75" />
-                <div class="slider-hints">
-                  <span>Preserve</span>
-                  <span>Balance</span>
-                  <span>Rebuild</span>
-                </div>
-              </div>
-            </div>
-
-            <p class="drawer-note" id="settingsNote">Document-driven modes use the active Photoshop canvas as the source surface.</p>
-          </div>
-        </section>
-
-        <section class="drawer card" id="historyDrawer">
-          <button class="drawer-toggle" id="toggleHistoryDrawer" type="button" aria-expanded="false">
-            <div>
-              <div class="section-kicker">History</div>
-              <h2>Recent renders</h2>
-            </div>
-            <span class="drawer-state">Closed</span>
-          </button>
-
-          <div class="drawer-body">
-            <div class="history-list" id="historyList"></div>
-          </div>
-        </section>
-      </div>
-
-      <div class="message-strip" id="errorMessage" role="status" aria-live="polite"></div>
-    </main>
-
-    <footer class="panel-footer">
-      <span id="statusText">Server offline</span>
-      <span id="footerMeta">Queue idle</span>
-    </footer>
+    </div>
+    <div class="status-pill is-offline" id="statusPill">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusLabel">OFFLINE</span>
+    </div>
   </div>
 
-  <script src="index.js"></script>
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-before" id="beforeLayer"><img id="beforeImage" alt="Before preview"></div>
+    <div class="canvas-after" id="afterLayer"><img id="previewImage" alt="After preview"></div>
+    <div class="canvas-placeholder" id="canvasPlaceholder">
+      <div class="canvas-grid"></div>
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="opacity:0.25;position:relative;z-index:1;">
+        <rect x="4" y="4" width="20" height="20" rx="3" stroke="#7c6ef5" stroke-width="1.5"/>
+        <path d="M4 18l6-5 5 4 3-3 6 5" stroke="#7c6ef5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="10" cy="11" r="2" fill="#7c6ef5" opacity="0.6"/>
+      </svg>
+      <div class="canvas-label" id="canvasLabel" style="position:relative;z-index:1;">No active selection</div>
+    </div>
+    <div class="scan-overlay" id="scanOverlay"></div>
+    <div class="canvas-overlay">
+      <div class="canvas-badge" id="dimensionBadge">1024 × 1024</div>
+      <div class="canvas-badge" id="modeBadge">TXT</div>
+    </div>
+    <div class="ba-bar">
+      <button class="ba-btn active" id="beforeBtn" type="button">Before</button>
+      <button class="ba-btn" id="afterBtn" type="button">After</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabGenerate" type="button">Generate</button>
+    <button class="tab" id="tabInpaint" type="button">Inpaint</button>
+    <button class="tab" id="tabExpand" type="button">Expand</button>
+    <button class="tab" id="tabHistory" type="button">History</button>
+  </div>
+
+  <div class="body">
+    <div class="active-prompt" id="activePromptCard">
+      <div class="active-prompt-label">Active Prompt</div>
+      <div class="active-prompt-text" id="activePromptText"></div>
+    </div>
+
+    <div class="prompt-wrap" id="promptWrap">
+      <div class="prompt-label">Prompt</div>
+      <textarea class="prompt-box" id="promptInput" maxlength="512" placeholder="Describe what to create or edit..."></textarea>
+      <div class="prompt-footer">
+        <div class="mode-chips">
+          <button class="chip active" id="chipImg2Img" type="button">Img→Img</button>
+          <button class="chip" id="chipTxt2Img" type="button">Txt→Img</button>
+        </div>
+        <div class="char-count"><span id="charCount">0</span> / 512</div>
+      </div>
+    </div>
+
+    <div class="progress-area" id="progressArea">
+      <div class="progress-top">
+        <div class="progress-label">Diffusion Progress</div>
+        <div class="progress-pct" id="progressPct">0%</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+      </div>
+      <div class="progress-sub" id="progressSub">Waiting for generation.</div>
+    </div>
+
+    <div class="gen-stats" id="generationStats">
+      <div class="gen-stat-card">
+        <div class="gen-stat-label">Speed</div>
+        <div class="gen-stat-value" id="speedValue">--</div>
+        <div class="gen-stat-sub">it/s</div>
+      </div>
+      <div class="gen-stat-card">
+        <div class="gen-stat-label">ETA</div>
+        <div class="gen-stat-value" id="etaValue">--</div>
+        <div class="gen-stat-sub">remain</div>
+      </div>
+      <div class="gen-stat-card">
+        <div class="gen-stat-label">Batch</div>
+        <div class="gen-stat-value" id="batchValue">1/1</div>
+        <div class="gen-stat-sub">images</div>
+      </div>
+    </div>
+
+    <button class="cancel-btn" id="cancelBtn" type="button">Cancel Generation</button>
+
+    <div class="section-label">Parameters</div>
+    <div class="params-grid">
+      <div class="param-card" id="strengthCard">
+        <div class="param-label" id="strengthLabel">Strength</div>
+        <input type="range" class="param-slider" id="settingStrength" min="5" max="100" value="72">
+        <div class="param-val"><span class="pv" id="strengthValue">72%</span><span id="strengthHint">Denoising</span></div>
+      </div>
+      <div class="param-card">
+        <div class="param-label">Guidance</div>
+        <input type="range" class="param-slider" id="settingGuidance" min="10" max="200" value="75">
+        <div class="param-val"><span class="pv" id="guidanceValue">7.5</span><span>CFG Scale</span></div>
+      </div>
+      <div class="param-card">
+        <div class="param-label">Steps</div>
+        <input type="range" class="param-slider" id="settingSteps" min="10" max="50" value="28">
+        <div class="param-val"><span class="pv" id="stepsValue">28</span><span>Inference</span></div>
+      </div>
+      <div class="param-card" id="resolutionCard">
+        <div class="param-label" id="detailLabel">Resolution</div>
+        <input type="range" class="param-slider" id="settingResolution" min="512" max="2048" step="64" value="1024">
+        <div class="param-val"><span class="pv" id="resolutionValue">1024</span><span id="detailHint">Square</span></div>
+      </div>
+    </div>
+
+    <div class="section-label">Seed</div>
+    <div class="seed-row">
+      <input class="seed-input" id="settingSeed" type="text" placeholder="Random" value="-1">
+      <button class="seed-dice" id="seedDice" type="button">⚄</button>
+    </div>
+
+    <div class="section-label">Output</div>
+    <div class="layer-row">
+      <select class="layer-select" id="layerRouting">
+        <option value="new_layer">New layer above selection</option>
+        <option value="replace_canvas">Replace active layer</option>
+        <option value="new_mask">Add as mask review layer</option>
+      </select>
+      <button class="icon-btn" id="refreshBtn" type="button" title="Refresh models and status">
+        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="2" stroke="#5c5c6e" stroke-width="1.2"/>
+          <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.8 2.8l1.1 1.1M10.1 10.1l1.1 1.1M2.8 11.2l1.1-1.1M10.1 3.9l1.1-1.1" stroke="#5c5c6e" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="applyBtn" type="button" title="Apply result" disabled>
+        <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2 3a1 1 0 011-1h6.5L12 4.5V11a1 1 0 01-1 1H3a1 1 0 01-1-1V3z" stroke="#5c5c6e" stroke-width="1.2"/>
+          <rect x="4" y="2" width="4" height="3" rx="0.5" stroke="#5c5c6e" stroke-width="1.2"/>
+          <rect x="4" y="7" width="6" height="4" rx="0.5" stroke="#5c5c6e" stroke-width="1.2"/>
+        </svg>
+      </button>
+    </div>
+
+    <button class="generate-btn" id="generateBtn" type="button" disabled>
+      <div class="btn-inner">
+        <svg class="btn-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" fill="white" opacity="0.9"/>
+          <path d="M13 2l.8 1.7L15.5 4.5l-1.7.8L13 7l-.8-1.7L10.5 4.5l1.7-.8L13 2z" fill="white" opacity="0.5"/>
+        </svg>
+        <span id="generateLabel">Generate</span>
+      </div>
+    </button>
+
+    <div class="message-inline" id="errorMessage" role="status" aria-live="polite"></div>
+    <select id="settingModel" hidden></select>
+  </div>
+
+  <div class="vram-row">
+    <div class="vram-label">VRAM</div>
+    <div class="vram-track"><div class="vram-fill" id="vramFill"></div></div>
+    <div class="vram-val" id="gpuInfo">--</div>
+  </div>
+
+  <div class="history-strip" id="historyStrip">
+    <button class="hist-add" id="saveHistoryBtn" type="button">+</button>
+  </div>
+</div>
+<script src="index.js"></script>
 </body>
 </html>

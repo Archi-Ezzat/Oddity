@@ -30,23 +30,36 @@ Oddity is designed for artists and retouchers who want modern AI editing inside 
 
 ## Installation
 
-### 1. Prepare Python
+### End-User Installation
 
-Run:
+End users should not need Adobe UXP Developer Tool.
+
+The recommended release format is a packaged Photoshop UXP `.ccx` installer:
+
+1. Download the released `Oddity.ccx` package.
+2. Double-click the `.ccx` file.
+3. Let Adobe Creative Cloud install the plugin.
+4. Open Photoshop 2025 and launch Oddity from the Plugins menu.
+
+This is the simplest supported distribution path for private sharing outside the Adobe Marketplace.
+
+### Developer Installation
+
+If you are running the plugin from source while developing:
+
+1. Prepare Python:
 
 ```powershell
 setup.bat
 ```
 
-### 2. Check Required Assets
-
-Run a checklist pass:
+2. Check required assets:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1
 ```
 
-To auto-download supported missing assets:
+Optional supported downloads:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1 -DownloadMissing
@@ -60,9 +73,7 @@ downloads/assets/models/vae/
 downloads/assets/models/unet/flux/
 ```
 
-### 3. Start the Local Backend
-
-Run:
+3. Start the local backend:
 
 ```powershell
 start_server.bat
@@ -70,11 +81,10 @@ start_server.bat
 
 The server listens on `127.0.0.1:5000` by default.
 
-### 4. Load the Photoshop Panel
+4. Load the panel from source with Adobe UXP Developer Tool:
 
-1. Open Adobe UXP Developer Tools.
-2. Add `plugin/manifest.json`.
-3. Load or reload the plugin in Photoshop 2025.
+- add `plugin/manifest.json`
+- load or reload the plugin in Photoshop 2025
 
 ## Fresh-Machine Bootstrap
 
@@ -85,6 +95,15 @@ bootstrap.bat
 ```
 
 The bootstrap flow creates the Python environment, checks the asset manifest, and points you to the backend start step. The generated checklist report is written to `downloads/CHECKLIST.generated.md`.
+
+## Distribution
+
+Oddity has two practical distribution modes:
+
+- `.ccx` direct distribution for private users and testing
+- Adobe Creative Cloud Marketplace for public release and update management
+
+For this project, the simplest user-facing path is direct `.ccx` distribution. UXP Developer Tool is only needed by the developer to package or debug the plugin, not by the user who installs it.
 
 ## Positioning
 
