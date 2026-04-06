@@ -1,0 +1,390 @@
+{
+  "families": {
+    "flux": {
+      "display_name": "FLUX",
+      "description": "Black Forest Labs FLUX — state-of-the-art text rendering, prompt adherence, and photorealism",
+      "pipeline_type": "flux",
+      "requires_components": ["clip_l", "t5xxl_fp16", "flux_vae"],
+      "supports_inpaint": true,
+      "inpaint_pipeline_type": "flux_fill",
+      "inpaint_requires_components": ["clip_l", "t5xxl_fp16", "flux_vae"],
+      "min_vram_gb": 8,
+      "recommended_vram_gb": 12,
+      "badge_color": "#7C8CFF",
+      "models": [
+        {
+          "id": "flux1-dev",
+          "name": "FLUX.1 Dev",
+          "filename": "flux1-dev.safetensors",
+          "size_gb": 23.8,
+          "download_url": null,
+          "source_url": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
+          "description": "High-quality base model with exceptional prompt adherence. Gated — download manually from HuggingFace.",
+          "default_steps": 28,
+          "default_guidance": 3.5,
+          "license": "FLUX.1 Dev Non-Commercial"
+        },
+        {
+          "id": "flux1-schnell",
+          "name": "FLUX.1 Schnell",
+          "filename": "flux1-schnell.safetensors",
+          "size_gb": 23.8,
+          "download_url": null,
+          "source_url": "https://huggingface.co/black-forest-labs/FLUX.1-schnell",
+          "description": "Apache 2.0 distilled model — extremely fast 1-4 step generation. Gated HF repo.",
+          "default_steps": 4,
+          "default_guidance": 0.0,
+          "license": "Apache 2.0"
+        },
+        {
+          "id": "flux2-klein-9b",
+          "name": "FLUX.2 Klein 9B",
+          "filename": "flux-2-klein-9b.safetensors",
+          "size_gb": 17.2,
+          "download_url": null,
+          "source_url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-9B",
+          "description": "Compact 9B parameter model — faster inference with lower VRAM usage.",
+          "default_steps": 20,
+          "default_guidance": 3.5,
+          "license": "FLUX.2 Non-Commercial"
+        },
+        {
+          "id": "flux1-fill-dev",
+          "name": "FLUX.1 Fill Dev (Inpaint)",
+          "filename": "flux1-fill-dev.safetensors",
+          "size_gb": 23.8,
+          "download_url": null,
+          "source_url": "https://huggingface.co/black-forest-labs/FLUX.1-Fill-dev",
+          "description": "Dedicated inpainting/outpainting model for image editing workflows.",
+          "default_steps": 28,
+          "default_guidance": 3.5,
+          "is_inpaint_model": true,
+          "license": "FLUX.1 Dev Non-Commercial"
+        }
+      ]
+    },
+    "sdxl": {
+      "display_name": "SDXL",
+      "description": "Stable Diffusion XL — widely supported workhorse with huge community ecosystem of LoRAs and fine-tunes",
+      "pipeline_type": "sdxl",
+      "requires_components": [],
+      "supports_inpaint": true,
+      "inpaint_pipeline_type": "sdxl_inpaint",
+      "inpaint_requires_components": [],
+      "min_vram_gb": 6,
+      "recommended_vram_gb": 8,
+      "badge_color": "#49DCB1",
+      "models": [
+        {
+          "id": "sdxl-base-1.0",
+          "name": "SDXL Base 1.0",
+          "filename": "sd_xl_base_1.0.safetensors",
+          "size_gb": 6.94,
+          "download_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors",
+          "source_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0",
+          "description": "Official Stability AI SDXL base checkpoint. Solid all-around generalist model.",
+          "default_steps": 30,
+          "default_guidance": 7.5,
+          "license": "CreativeML Open RAIL++-M"
+        },
+        {
+          "id": "sdxl-turbo",
+          "name": "SDXL Turbo",
+          "filename": "sd_xl_turbo_1.0_fp16.safetensors",
+          "size_gb": 6.5,
+          "download_url": "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/sd_xl_turbo_1.0_fp16.safetensors",
+          "source_url": "https://huggingface.co/stabilityai/sdxl-turbo",
+          "description": "Distilled 1-4 step model for near-instant generation. Great for previewing ideas.",
+          "default_steps": 4,
+          "default_guidance": 0.0,
+          "license": "Stability AI Community"
+        },
+        {
+          "id": "sdxl-lightning-4step",
+          "name": "SDXL Lightning (4-step)",
+          "filename": "sdxl_lightning_4step.safetensors",
+          "size_gb": 6.5,
+          "download_url": "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step.safetensors",
+          "source_url": "https://huggingface.co/ByteDance/SDXL-Lightning",
+          "description": "ByteDance's distilled model — high quality at just 4 steps. Best speed/quality tradeoff.",
+          "default_steps": 4,
+          "default_guidance": 0.0,
+          "license": "OpenRAIL++"
+        },
+        {
+          "id": "sdxl-lightning-8step",
+          "name": "SDXL Lightning (8-step)",
+          "filename": "sdxl_lightning_8step.safetensors",
+          "size_gb": 6.5,
+          "download_url": "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_8step.safetensors",
+          "source_url": "https://huggingface.co/ByteDance/SDXL-Lightning",
+          "description": "ByteDance Lightning at 8 steps — better detail than 4-step, still fast.",
+          "default_steps": 8,
+          "default_guidance": 1.0,
+          "license": "OpenRAIL++"
+        },
+        {
+          "id": "juggernaut-xl",
+          "name": "Juggernaut XL",
+          "filename": "juggernautXL.safetensors",
+          "size_gb": 6.94,
+          "download_url": null,
+          "source_url": "https://huggingface.co/RunDiffusion/Juggernaut-XL",
+          "description": "Cinematic, high-quality realism. One of the most popular SDXL community models. Download from HuggingFace or Civitai.",
+          "default_steps": 30,
+          "default_guidance": 6.0,
+          "license": "CreativeML Open RAIL++-M"
+        },
+        {
+          "id": "realvisxl-v5",
+          "name": "RealVisXL V5.0",
+          "filename": "RealVisXL_V5.0_fp16.safetensors",
+          "size_gb": 6.5,
+          "download_url": null,
+          "source_url": "https://huggingface.co/SG161222/RealVisXL_V5.0",
+          "description": "Best-in-class photorealism for SDXL. Excellent for portraits and product photography.",
+          "default_steps": 28,
+          "default_guidance": 5.0,
+          "license": "CreativeML Open RAIL++-M"
+        },
+        {
+          "id": "dreamshaper-xl",
+          "name": "DreamShaper XL",
+          "filename": "dreamshaperXL.safetensors",
+          "size_gb": 6.94,
+          "download_url": null,
+          "source_url": "https://huggingface.co/Lykon/dreamshaper-xl-1-0",
+          "description": "Versatile model excellent for artistic, semi-realistic, and fantasy styles.",
+          "default_steps": 28,
+          "default_guidance": 7.0,
+          "license": "CreativeML Open RAIL++-M"
+        },
+        {
+          "id": "dreamshaper-xl-turbo",
+          "name": "DreamShaper XL Turbo",
+          "filename": "dreamshaperXL_turboDPM.safetensors",
+          "size_gb": 6.94,
+          "download_url": null,
+          "source_url": "https://huggingface.co/Lykon/dreamshaper-xl-v2-turbo",
+          "description": "Turbo variant of DreamShaper XL — fast 4-8 step generation.",
+          "default_steps": 6,
+          "default_guidance": 2.0,
+          "license": "CreativeML Open RAIL++-M"
+        },
+        {
+          "id": "pony-diffusion-xl",
+          "name": "Pony Diffusion V6 XL",
+          "filename": "ponyDiffusionV6XL.safetensors",
+          "size_gb": 6.94,
+          "download_url": null,
+          "source_url": "https://civitai.com/models/257749/pony-diffusion-v6-xl",
+          "description": "Extremely popular for stylized and character-focused generation. Huge LoRA ecosystem.",
+          "default_steps": 25,
+          "default_guidance": 7.0,
+          "license": "Fair AI Public"
+        }
+      ]
+    },
+    "sd3": {
+      "display_name": "SD3",
+      "description": "Stable Diffusion 3/3.5 — latest architecture with triple text encoders and improved composition",
+      "pipeline_type": "sd3",
+      "requires_components": [],
+      "supports_inpaint": false,
+      "min_vram_gb": 10,
+      "recommended_vram_gb": 16,
+      "badge_color": "#FFBF69",
+      "models": [
+        {
+          "id": "sd3-medium",
+          "name": "SD3 Medium",
+          "filename": "sd3_medium_incl_clips_t5xxlfp16.safetensors",
+          "size_gb": 17.8,
+          "download_url": null,
+          "source_url": "https://huggingface.co/stabilityai/stable-diffusion-3-medium",
+          "description": "Official SD3 medium with integrated encoders. Gated — accept license on HuggingFace.",
+          "default_steps": 28,
+          "default_guidance": 7.0,
+          "integrated_components": true,
+          "license": "Stability AI Community"
+        },
+        {
+          "id": "sd35-medium",
+          "name": "SD3.5 Medium",
+          "filename": "sd3.5_medium.safetensors",
+          "size_gb": 11.1,
+          "download_url": null,
+          "source_url": "https://huggingface.co/stabilityai/stable-diffusion-3.5-medium",
+          "description": "Improved SD3 medium — better prompt following and detail. Gated HF repo.",
+          "default_steps": 28,
+          "default_guidance": 5.0,
+          "integrated_components": true,
+          "license": "Stability AI Community"
+        },
+        {
+          "id": "sd35-large",
+          "name": "SD3.5 Large",
+          "filename": "sd3.5_large.safetensors",
+          "size_gb": 17.8,
+          "download_url": null,
+          "source_url": "https://huggingface.co/stabilityai/stable-diffusion-3.5-large",
+          "description": "Highest quality SD3 variant — best composition and coherence. Gated HF repo.",
+          "default_steps": 28,
+          "default_guidance": 4.5,
+          "integrated_components": true,
+          "license": "Stability AI Community"
+        },
+        {
+          "id": "sd35-large-turbo",
+          "name": "SD3.5 Large Turbo",
+          "filename": "sd3.5_large_turbo.safetensors",
+          "size_gb": 17.8,
+          "download_url": null,
+          "source_url": "https://huggingface.co/stabilityai/stable-diffusion-3.5-large-turbo",
+          "description": "Distilled turbo variant — same quality as Large but in 4-8 steps. Gated HF repo.",
+          "default_steps": 4,
+          "default_guidance": 0.0,
+          "integrated_components": true,
+          "license": "Stability AI Community"
+        }
+      ]
+    },
+    "sd15": {
+      "display_name": "SD 1.5",
+      "description": "Stable Diffusion 1.5 — lightweight classic with massive community ecosystem, runs on almost any GPU",
+      "pipeline_type": "sd15",
+      "requires_components": [],
+      "supports_inpaint": true,
+      "inpaint_pipeline_type": "sd15_inpaint",
+      "inpaint_requires_components": [],
+      "min_vram_gb": 4,
+      "recommended_vram_gb": 6,
+      "badge_color": "#E879F9",
+      "models": [
+        {
+          "id": "sd15-base",
+          "name": "Stable Diffusion 1.5",
+          "filename": "v1-5-pruned-emaonly.safetensors",
+          "size_gb": 4.27,
+          "download_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors",
+          "source_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5",
+          "description": "The original SD 1.5 base. Still great for many use cases and has the largest LoRA ecosystem.",
+          "default_steps": 25,
+          "default_guidance": 7.5,
+          "license": "CreativeML Open RAIL-M"
+        },
+        {
+          "id": "realistic-vision-v6",
+          "name": "Realistic Vision V6.0",
+          "filename": "realisticVision_v60B1.safetensors",
+          "size_gb": 2.13,
+          "download_url": null,
+          "source_url": "https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE",
+          "description": "Best photorealism model for SD 1.5. Download from HuggingFace or Civitai.",
+          "default_steps": 25,
+          "default_guidance": 7.0,
+          "license": "CreativeML Open RAIL-M"
+        },
+        {
+          "id": "dreamshaper-8",
+          "name": "DreamShaper 8",
+          "filename": "dreamshaper_8.safetensors",
+          "size_gb": 2.13,
+          "download_url": null,
+          "source_url": "https://huggingface.co/Lykon/DreamShaper",
+          "description": "Versatile, vibrant all-rounder. Great for artistic and semi-realistic styles.",
+          "default_steps": 25,
+          "default_guidance": 7.0,
+          "license": "CreativeML Open RAIL-M"
+        },
+        {
+          "id": "deliberate-v3",
+          "name": "Deliberate V3",
+          "filename": "deliberate_v3.safetensors",
+          "size_gb": 2.13,
+          "download_url": null,
+          "source_url": "https://civitai.com/models/4823/deliberate",
+          "description": "High-quality general purpose model with strong composition and detail.",
+          "default_steps": 28,
+          "default_guidance": 7.0,
+          "license": "CreativeML Open RAIL-M"
+        },
+        {
+          "id": "sd15-inpainting",
+          "name": "SD 1.5 Inpainting",
+          "filename": "sd-v1-5-inpainting.safetensors",
+          "size_gb": 4.27,
+          "download_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-inpainting/resolve/main/sd-v1-5-inpainting.safetensors",
+          "source_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-inpainting",
+          "description": "Official inpainting-fine-tuned model. Best for mask-based editing with SD 1.5.",
+          "default_steps": 25,
+          "default_guidance": 7.5,
+          "is_inpaint_model": true,
+          "license": "CreativeML Open RAIL-M"
+        }
+      ]
+    }
+  },
+  "components": {
+    "clip_l": {
+      "display_name": "CLIP-L Text Encoder",
+      "filename": "clip_l.safetensors",
+      "subfolder": "clip",
+      "size_gb": 0.24,
+      "download_url": "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors",
+      "source_url": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+      "shared": true,
+      "notes": "Shared by Flux and SD3 families. Lightweight at ~240 MB."
+    },
+    "clip_g": {
+      "display_name": "CLIP-G Text Encoder",
+      "filename": "clip_g.safetensors",
+      "subfolder": "clip",
+      "size_gb": 1.39,
+      "download_url": "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_g.safetensors",
+      "source_url": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+      "shared": true,
+      "notes": "Used by SD3 and SDXL (when loading from components). ~1.4 GB."
+    },
+    "t5xxl_fp16": {
+      "display_name": "T5-XXL FP16 Text Encoder",
+      "filename": "t5xxl_fp16.safetensors",
+      "subfolder": "clip",
+      "size_gb": 9.5,
+      "download_url": "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors",
+      "source_url": "https://huggingface.co/comfyanonymous/flux_text_encoders",
+      "shared": true,
+      "notes": "Large encoder (9.5 GB) shared by Flux and SD3. Only downloaded when a model requiring it is selected."
+    },
+    "flux_vae": {
+      "display_name": "FLUX VAE (Autoencoder)",
+      "filename": "ae.safetensors",
+      "subfolder": "vae",
+      "size_gb": 0.33,
+      "download_url": "https://huggingface.co/StableDiffusionVN/Flux/resolve/main/Vae/flux_vae.safetensors",
+      "source_url": "https://huggingface.co/StableDiffusionVN/Flux/blob/main/Vae/flux_vae.safetensors",
+      "family_specific": "flux",
+      "notes": "FLUX-specific VAE autoencoder."
+    },
+    "sdxl_vae": {
+      "display_name": "SDXL VAE (Optional)",
+      "filename": "sdxl_vae.safetensors",
+      "subfolder": "vae",
+      "size_gb": 0.33,
+      "download_url": "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors",
+      "source_url": "https://huggingface.co/stabilityai/sdxl-vae",
+      "family_specific": "sdxl",
+      "notes": "Optional improved SDXL VAE. Most SDXL checkpoints include a built-in VAE that works fine."
+    },
+    "sd15_vae": {
+      "display_name": "SD 1.5 VAE (Optional)",
+      "filename": "vae-ft-mse-840000-ema-pruned.safetensors",
+      "subfolder": "vae",
+      "size_gb": 0.33,
+      "download_url": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors",
+      "source_url": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original",
+      "family_specific": "sd15",
+      "notes": "Optional improved VAE for SD 1.5. Reduces color banding. Most checkpoints have a decent built-in VAE."
+    }
+  }
+}

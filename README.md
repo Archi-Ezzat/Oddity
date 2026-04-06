@@ -1,31 +1,45 @@
-﻿# Oddity
+# Oddity
 
-Oddity is a local-first AI image editing panel for Adobe Photoshop 2025. It combines a UXP plugin with a FLUX-based backend so prompt-driven editing, image-to-image generation, selection-aware workflows, and result routing happen on the user's machine instead of in a hosted web app.
+Oddity is a local-first AI image editing panel for Adobe Photoshop 2025. It combines a UXP plugin with a multi-model backend so prompt-driven editing, image-to-image generation, inpainting, outpainting, and result routing happen on the user's machine instead of in a hosted web app.
 
 ## Overview
 
-Oddity is designed for artists and retouchers who want modern AI editing inside Photoshop without giving up local control. The panel is built around four ideas:
+Oddity is designed for artists and retouchers who want modern AI editing inside Photoshop without giving up local control. The panel is built around five ideas:
 
 - local inference instead of cloud-bound generation
 - Photoshop-native workflow instead of an external companion app
 - professional parameter control instead of one-click black-box output
-- portable setup through a checked manifest of missing assets and download sources
+- multi-model support — Flux, SDXL, SD3, and any diffusers-compatible model
+- on-demand asset management — models and components are downloaded only when needed
+
+## Supported Model Families
+
+| Family | Pipeline | Min VRAM | Key Models |
+|--------|----------|----------|------------|
+| FLUX | FluxPipeline | 8 GB | FLUX.1 Dev, FLUX.1 Schnell, FLUX.2 Klein 9B, FLUX.1 Fill |
+| SDXL | StableDiffusionXLPipeline | 6 GB | SDXL Base, SDXL Turbo, Lightning, Juggernaut XL, RealVisXL, DreamShaper XL, Pony V6 |
+| SD3 | StableDiffusion3Pipeline | 10 GB | SD3 Medium, SD3.5 Medium, SD3.5 Large, SD3.5 Large Turbo |
+| SD 1.5 | StableDiffusionPipeline | 4 GB | SD 1.5 Base, Realistic Vision V6, DreamShaper 8, Deliberate V3 |
 
 ## Core Capabilities
 
-- text-to-image generation
+- text-to-image generation with any supported model
 - document-driven image-to-image editing
+- inpainting with mask support (Flux Fill, SDXL Inpaint)
+- outpainting / image extension
 - in-panel prompt composition and preset recall
 - parameter control for steps, guidance, seed, and strength
 - output routing to a new layer, canvas replacement, or mask review layer
+- model library with on-demand download and auto-organization
 - local model health, queue, and GPU telemetry
 - generation history with prompt and preview recovery
 
 ## Project Structure
 
 - `plugin/` Photoshop UXP panel source
-- `backend/` local FastAPI inference server
-- `downloads/` asset manifest, checklist generator, and source links for another machine
+- `backend/` local FastAPI inference server with multi-model support
+- `backend/model_registry.json` defines all supported model families and download sources
+- `downloads/` asset manifest, checklist generator, and source links
 - `bootstrap.bat` guided local setup entry point
 - `install_plugin.bat` direct Windows installer for Photoshop
 
@@ -38,32 +52,15 @@ You do not need Adobe UXP Developer Tool to use Oddity from this project folder.
 1. Close Photoshop.
 2. Run `install_plugin.bat` as Administrator.
 3. Run `setup.bat` if the machine is not prepared yet.
-4. Run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1
-```
-
-Optional supported downloads:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1 -DownloadMissing
-```
-
-5. Start the local backend:
+4. Start the local backend:
 
 ```powershell
 start_server.bat
 ```
 
-6. Open Photoshop 2025.
-7. Launch Oddity from `Plugins > Oddity AI`.
-
-This is currently the simplest reliable user flow.
-
-### Optional Packaged Installation
-
-A `.ccx` package is still a valid release format, but it must be freshly packaged from the current plugin source. Renaming an old `.ccx` file does not update the plugin name or id inside Adobe.
+5. Open Photoshop 2025.
+6. Launch Oddity from `Plugins > Oddity AI`.
+7. Open the **Model Library** in the plugin to download your first model.
 
 ### Developer Installation
 
@@ -75,32 +72,49 @@ If you are running the plugin from source while developing:
 setup.bat
 ```
 
-2. Check required assets:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File downloads\check_and_download.ps1
-```
-
-3. Start the local backend:
+2. Start the local backend:
 
 ```powershell
 start_server.bat
 ```
 
-4. Load the panel from source with Adobe UXP Developer Tool:
+3. Load the panel from source with Adobe UXP Developer Tool:
 
 - add `plugin/manifest.json`
 - load or reload the plugin in Photoshop 2025
 
-## Fresh-Machine Bootstrap
+## Model Management
 
-If you are moving the project to another PC, run:
+Models are organized by family under `downloads/assets/models/`:
 
-```powershell
-bootstrap.bat
+```
+downloads/assets/
+├── models/
+│   ├── flux/checkpoints/
+│   ├── sdxl/checkpoints/
+│   ├── sd3/checkpoints/
+│   └── sd15/checkpoints/
+└── components/
+    ├── shared/clip/       (CLIP-L, CLIP-G, T5-XXL — shared across families)
+    ├── shared/vae/
+    ├── flux/vae/
+    ├── sdxl/vae/
+    ├── sd3/vae/
+    └── sd15/vae/
 ```
 
-The bootstrap flow creates the Python environment, checks the asset manifest, and points you to the backend start step. The generated checklist report is written to `downloads/CHECKLIST.generated.md`.
+**On-demand downloads:** When you select a model in the plugin's Model Library, the backend automatically downloads the checkpoint and any required components (text encoders, VAE). Components shared across model families (e.g., CLIP-L) are only downloaded once.
+
+**Manual placement:** You can also manually place `.safetensors` files in the correct folder. The server will detect them on the next refresh.
+
+## GPU Optimization
+
+The backend starts with **zero models loaded** — no VRAM is consumed until you select a model. Key optimizations:
+
+- Lazy loading: pipeline is built only when first needed
+- CPU offload: keeps components on CPU until inference
+- Attention slicing: reduces peak VRAM by ~30%
+- Full cleanup: when switching model families, the old pipeline is fully unloaded before loading the new one
 
 ## Distribution
 
@@ -112,19 +126,8 @@ Oddity has three practical distribution modes:
 
 Right now, the simplest user-facing path is `install_plugin.bat` plus the local backend setup.
 
-## Positioning
-
-Oddity sits in the same problem space as several top-tier AI imaging tools, but it is intentionally optimized for a different workflow:
-
-- Adobe Photoshop Generative Fill and Firefly focus on tightly integrated cloud-assisted generation inside Photoshop.
-- Topaz Photo AI focuses on AI-assisted enhancement, denoise, sharpening, and restoration workflows.
-- Topaz Gigapixel focuses on high-end AI upscaling and detail recovery.
-- Luminar Neo combines AI photo editing with generative tools such as GenErase and GenExpand in a standalone editor.
-
-Oddity's differentiator is local, private generation inside a custom Photoshop UXP panel with editable parameters and project-portable asset management.
-
 ## Notes
 
 - Heavy model files and machine-specific artifacts are intentionally excluded from Git.
 - The backend defaults to repo-local assets under `downloads/assets/`.
-- At least one compatible transformer `.safetensors` file should exist under `downloads/assets/models/unet/flux/`.
+- Models and components are downloaded on-demand via the Model Library in the plugin.

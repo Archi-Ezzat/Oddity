@@ -1,6 +1,6 @@
 @echo off
 echo ============================================================
-echo   Oddity - FLUX.1-dev-SRPO Server
+echo   Oddity - Local AI Server
 echo ============================================================
 echo.
 

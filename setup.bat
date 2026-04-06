@@ -1,6 +1,6 @@
 @echo off
 echo ============================================================
-echo   Oddity - Setup
+echo   Oddity - Environment Setup
 echo ============================================================
 echo.
 

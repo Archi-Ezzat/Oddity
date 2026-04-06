@@ -1,202 +1,237 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flux Atelier</title>
+<title>Oddity AI</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
 </head>
-<body data-status="offline" data-mode="generate" data-compare="after">
+<body data-status="offline" data-mode="generate" data-compare="after" data-view="main">
 <div class="panel">
   <div class="header">
     <div class="logo">
       <div class="logo-mark" id="logoMark"></div>
       <div>
-        <div class="logo-text">Flux Atelier</div>
-        <div class="logo-sub" id="logoSub">SRPO · bf16</div>
+        <div class="logo-text">Oddity AI</div>
+        <div class="logo-sub" id="logoSub">Local AI · Multi-Model</div>
       </div>
     </div>
-    <div class="status-pill is-offline" id="statusPill">
-      <div class="dot" id="statusDot"></div>
-      <span id="statusLabel">OFFLINE</span>
-    </div>
-  </div>
-
-  <div class="canvas-area" id="canvasArea">
-    <div class="canvas-before" id="beforeLayer"><img id="beforeImage" alt="Before preview"></div>
-    <div class="canvas-after" id="afterLayer"><img id="previewImage" alt="After preview"></div>
-    <div class="canvas-placeholder" id="canvasPlaceholder">
-      <div class="canvas-grid"></div>
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="opacity:0.25;position:relative;z-index:1;">
-        <rect x="4" y="4" width="20" height="20" rx="3" stroke="#7c6ef5" stroke-width="1.5"/>
-        <path d="M4 18l6-5 5 4 3-3 6 5" stroke="#7c6ef5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <circle cx="10" cy="11" r="2" fill="#7c6ef5" opacity="0.6"/>
-      </svg>
-      <div class="canvas-label" id="canvasLabel" style="position:relative;z-index:1;">No active selection</div>
-    </div>
-    <div class="scan-overlay" id="scanOverlay"></div>
-    <div class="canvas-overlay">
-      <div class="canvas-badge" id="dimensionBadge">1024 × 1024</div>
-      <div class="canvas-badge" id="modeBadge">TXT</div>
-    </div>
-    <div class="ba-bar">
-      <button class="ba-btn active" id="beforeBtn" type="button">Before</button>
-      <button class="ba-btn" id="afterBtn" type="button">After</button>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <button class="tab active" id="tabGenerate" type="button">Generate</button>
-    <button class="tab" id="tabInpaint" type="button">Inpaint</button>
-    <button class="tab" id="tabExpand" type="button">Expand</button>
-    <button class="tab" id="tabHistory" type="button">History</button>
-  </div>
-
-  <div class="body">
-    <div class="active-prompt" id="activePromptCard">
-      <div class="active-prompt-label">Active Prompt</div>
-      <div class="active-prompt-text" id="activePromptText"></div>
-    </div>
-
-    <div class="prompt-wrap" id="promptWrap">
-      <div class="prompt-label">Prompt</div>
-      <textarea class="prompt-box" id="promptInput" maxlength="512" placeholder="Describe what to generate inside the active selection..."></textarea>
-      <div class="prompt-footer">
-        <div class="prompt-helper">Select a mask or selection, then describe the fill.</div>
-        <div class="char-count"><span id="charCount">0</span> / 512</div>
-      </div>
-    </div>
-
-    <div class="progress-area" id="progressArea">
-      <div class="progress-top">
-        <div class="progress-label">Diffusion Progress</div>
-        <div class="progress-pct" id="progressPct">0%</div>
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
-      </div>
-      <div class="progress-sub" id="progressSub">Waiting for generation.</div>
-    </div>
-
-    <div class="gen-stats" id="generationStats">
-      <div class="gen-stat-card">
-        <div class="gen-stat-label">Speed</div>
-        <div class="gen-stat-value" id="speedValue">--</div>
-        <div class="gen-stat-sub">it/s</div>
-      </div>
-      <div class="gen-stat-card">
-        <div class="gen-stat-label">ETA</div>
-        <div class="gen-stat-value" id="etaValue">--</div>
-        <div class="gen-stat-sub">remain</div>
-      </div>
-      <div class="gen-stat-card">
-        <div class="gen-stat-label">Batch</div>
-        <div class="gen-stat-value" id="batchValue">1/1</div>
-        <div class="gen-stat-sub">images</div>
-      </div>
-    </div>
-
-    <button class="cancel-btn" id="cancelBtn" type="button">Cancel Generation</button>
-
-    <div class="section-label">Parameters</div>
-    <div class="params-grid">
-      <div class="param-card" id="strengthCard">
-        <div class="param-label" id="strengthLabel">Strength</div>
-        <input type="range" class="param-slider" id="settingStrength" min="5" max="100" value="72">
-        <div class="param-val"><span class="pv" id="strengthValue">72%</span><span id="strengthHint">Denoising</span></div>
-      </div>
-      <div class="param-card">
-        <div class="param-label">Guidance</div>
-        <input type="range" class="param-slider" id="settingGuidance" min="10" max="200" value="75">
-        <div class="param-val"><span class="pv" id="guidanceValue">7.5</span><span>CFG Scale</span></div>
-      </div>
-      <div class="param-card">
-        <div class="param-label">Steps</div>
-        <input type="range" class="param-slider" id="settingSteps" min="10" max="50" value="28">
-        <div class="param-val"><span class="pv" id="stepsValue">28</span><span>Inference</span></div>
-      </div>
-      <div class="param-card" id="resolutionCard">
-        <div class="param-label" id="detailLabel">Resolution</div>
-        <input type="range" class="param-slider" id="settingResolution" min="512" max="2048" step="64" value="1024">
-        <div class="param-val"><span class="pv" id="resolutionValue">1024</span><span id="detailHint">Square</span></div>
-      </div>
-    </div>
-
-    <div class="section-label">Seed</div>
-    <div class="seed-row">
-      <input class="seed-input" id="settingSeed" type="text" placeholder="Random" value="-1">
-      <button class="seed-dice" id="seedDice" type="button">⚄</button>
-    </div>
-
-    <div class="section-label">Output</div>
-    <div class="layer-row">
-      <select class="layer-select" id="layerRouting">
-        <option value="new_layer">New layer above selection</option>
-        <option value="replace_canvas">Replace active layer</option>
-        <option value="new_mask">Add as mask review layer</option>
-      </select>
-      <button class="icon-btn" id="refreshBtn" type="button" title="Refresh models and status">
-        <svg viewBox="0 0 64 64" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
-            <path d="M32,14.002c-9.941,0-18,8.059-18,18s8.059,18,18,18s18-8.059,18-18S41.941,14.002,32,14.002z M32,48.002c-8.837,0-16-7.164-16-16s7.163-16,16-16s16,7.164,16,16S40.837,48.002,32,48.002z"/>
-            <path d="M32,20.002c-0.553,0-1,0.447-1,1s0.447,1,1,1c5.522,0,10,4.477,10,10c0,0.553,0.447,1,1,1s1-0.447,1-1C44,25.375,38.627,20.002,32,20.002z"/>
-            <path d="M63,31H53c-0.553,0-1,0.447-1,1s0.447,1,1,1h10c0.553,0,1-0.447,1-1S63.553,31,63,31z"/>
-            <path d="M11.457,36.47l-3.863,1.035c-0.534,0.144-0.851,0.692-0.707,1.226c0.143,0.533,0.69,0.85,1.225,0.706l3.863-1.035c0.533-0.143,0.85-0.69,0.707-1.225C12.539,36.644,11.99,36.327,11.457,36.47z"/>
-            <path d="M49.32,22c0.277,0.479,0.888,0.643,1.367,0.366l8.66-5c0.479-0.276,0.643-0.888,0.365-1.366c-0.275-0.479-0.887-0.642-1.365-0.365l-8.66,5C49.208,20.912,49.045,21.521,49.32,22z"/>
-            <path d="M17.858,46.143c-0.39-0.391-1.023-0.389-1.414,0l-2.828,2.828c-0.391,0.391-0.39,1.025,0.001,1.415c0.39,0.391,1.022,0.39,1.413-0.001l2.828-2.828C18.249,47.168,18.249,46.534,17.858,46.143z"/>
-            <path d="M42,14.68c0.479,0.276,1.09,0.113,1.367-0.366l5-8.66C48.644,5.175,48.48,4.563,48,4.287c-0.478-0.276-1.088-0.112-1.365,0.366l-4.999,8.661C41.358,13.793,41.522,14.403,42,14.68z"/>
-            <path d="M26.824,51.318c-0.532-0.143-1.08,0.176-1.225,0.707l-1.035,3.863c-0.143,0.535,0.176,1.083,0.709,1.226c0.533,0.144,1.08-0.173,1.223-0.708l1.035-3.863C27.676,52.012,27.359,51.463,26.824,51.318z"/>
-            <path d="M32,12c0.554,0,1.001-0.446,1.002-1V1c0-0.553-0.447-1-1.002-1c-0.551,0-0.998,0.447-0.999,1l0.001,10C31.002,11.553,31.449,12,32,12z"/>
-            <path d="M38.402,52.025c-0.141-0.532-0.689-0.85-1.225-0.707c-0.533,0.143-0.848,0.692-0.707,1.225l1.035,3.863c0.144,0.535,0.693,0.85,1.227,0.707s0.849-0.689,0.705-1.225L38.402,52.025z"/>
-            <path d="M20.637,14.312c0.275,0.479,0.887,0.643,1.363,0.367c0.48-0.277,0.645-0.887,0.368-1.367l-5-8.66C17.092,4.174,16.48,4.01,16,4.287c-0.477,0.275-0.641,0.887-0.365,1.365L20.637,14.312z"/>
-            <path d="M47.558,46.142c-0.388-0.39-1.022-0.39-1.414,0c-0.391,0.39-0.388,1.024,0,1.414l2.828,2.828c0.392,0.392,1.025,0.389,1.415-0.001c0.391-0.39,0.391-1.021-0.001-1.413L47.558,46.142z"/>
-            <path d="M4.654,17.365l8.662,4.999c0.477,0.276,1.088,0.113,1.363-0.364c0.277-0.479,0.115-1.09-0.364-1.367l-8.661-5C5.176,15.356,4.564,15.52,4.287,16C4.013,16.477,4.176,17.089,4.654,17.365z"/>
-            <path d="M52.027,38.4l3.863,1.035c0.535,0.145,1.082-0.176,1.225-0.709c0.144-0.532-0.172-1.079-0.707-1.223l-3.863-1.035c-0.531-0.145-1.081,0.173-1.225,0.707C51.176,37.709,51.496,38.256,52.027,38.4z"/>
-            <path d="M12,32c0.001-0.554-0.445-1-0.998-1.002L1,31c-0.552,0-1,0.445-1,1c0.001,0.551,0.448,1,1.001,1l10.001-0.002C11.553,32.998,12.001,32.552,12,32z"/>
-            <path d="M52.545,27.529l3.863-1.035c0.535-0.143,0.85-0.693,0.706-1.227c-0.142-0.531-0.688-0.848-1.224-0.705l-3.863,1.035c-0.533,0.141-0.85,0.691-0.707,1.225C51.461,27.356,52.012,27.67,52.545,27.529z"/>
-            <path d="M14.68,42c-0.275-0.48-0.886-0.644-1.365-0.368l-8.661,5.002C4.176,46.91,4.01,47.52,4.287,48c0.277,0.477,0.889,0.641,1.367,0.365l8.66-5.002C14.791,43.088,14.957,42.479,14.68,42z"/>
-            <path d="M46.144,17.856c0.389,0.392,1.022,0.388,1.414,0l2.828-2.828c0.392-0.392,0.39-1.024-0.002-1.415c-0.388-0.39-1.021-0.391-1.412,0.001l-2.828,2.828C45.752,16.83,45.754,17.466,46.144,17.856z"/>
-            <path d="M22,49.32c-0.479-0.277-1.088-0.113-1.365,0.364l-5,8.663c-0.275,0.478-0.115,1.088,0.365,1.365c0.479,0.274,1.09,0.11,1.367-0.367l4.998-8.662C22.641,50.207,22.48,49.597,22,49.32z"/>
-            <path d="M37.178,12.68c0.531,0.145,1.078-0.176,1.225-0.707l1.035-3.863c0.143-0.535-0.176-1.083-0.709-1.225c-0.531-0.144-1.08,0.172-1.223,0.707l-1.035,3.863C36.324,11.986,36.645,12.536,37.178,12.68z"/>
-            <path d="M32,52c-0.553-0.002-0.998,0.446-1,0.998l0.002,10.004C31.002,63.552,31.445,64,32,64c0.553,0,1-0.449,1.001-1l-0.003-10.002C32.998,52.447,32.555,52,32,52z"/>
-            <path d="M25.6,11.973c0.139,0.533,0.691,0.85,1.225,0.707c0.532-0.141,0.846-0.691,0.707-1.225l-1.035-3.863c-0.145-0.535-0.693-0.851-1.227-0.706c-0.531,0.142-0.85,0.688-0.705,1.224L25.6,11.973z"/>
-            <path d="M43.363,49.687c-0.275-0.478-0.883-0.644-1.363-0.365c-0.479,0.274-0.641,0.885-0.367,1.364l5.004,8.661c0.275,0.478,0.883,0.644,1.363,0.366c0.479-0.277,0.642-0.889,0.367-1.367L43.363,49.687z"/>
-            <path d="M16.443,17.856c0.387,0.394,1.023,0.39,1.414,0c0.391-0.388,0.387-1.021,0-1.414l-2.828-2.828c-0.393-0.392-1.025-0.39-1.415,0.002c-0.39,0.388-0.392,1.021,0.001,1.412L16.443,17.856z"/>
-            <path d="M59.348,46.633l-8.663-4.997c-0.478-0.276-1.087-0.116-1.363,0.366c-0.278,0.477-0.112,1.086,0.364,1.364l8.664,4.999c0.477,0.275,1.086,0.115,1.363-0.365C59.988,47.521,59.824,46.91,59.348,46.633z"/>
-            <path d="M11.974,25.599L8.11,24.563c-0.536-0.144-1.083,0.175-1.225,0.708c-0.144,0.531,0.171,1.08,0.707,1.225l3.863,1.034c0.531,0.146,1.081-0.175,1.225-0.707C12.825,26.293,12.505,25.746,11.974,25.599z"/>
-          </g>
+    <div class="header-actions">
+      <button class="header-icon-btn" id="viewLibraryBtn" type="button" title="Model Library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          <line x1="9" y1="7" x2="15" y2="7"/>
+          <line x1="9" y1="11" x2="13" y2="11"/>
         </svg>
       </button>
-      <button class="icon-btn" id="applyBtn" type="button" title="Apply result" disabled>
-        <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <path fill-rule="evenodd" clip-rule="evenodd" d="M18.1716 1C18.702 1 19.2107 1.21071 19.5858 1.58579L22.4142 4.41421C22.7893 4.78929 23 5.29799 23 5.82843V20C23 21.6569 21.6569 23 20 23H4C2.34315 23 1 21.6569 1 20V4C1 2.34315 2.34315 1 4 1H18.1716ZM4 3C3.44772 3 3 3.44772 3 4V20C3 20.5523 3.44772 21 4 21L5 21L5 15C5 13.3431 6.34315 12 8 12L16 12C17.6569 12 19 13.3431 19 15V21H20C20.5523 21 21 20.5523 21 20V6.82843C21 6.29799 20.7893 5.78929 20.4142 5.41421L18.5858 3.58579C18.2107 3.21071 17.702 3 17.1716 3H17V5C17 6.65685 15.6569 8 14 8H10C8.34315 8 7 6.65685 7 5V3H4ZM17 21V15C17 14.4477 16.5523 14 16 14L8 14C7.44772 14 7 14.4477 7 15L7 21L17 21ZM9 3H15V5C15 5.55228 14.5523 6 14 6H10C9.44772 6 9 5.55228 9 5V3Z" fill="currentColor"/>
+      <div class="status-pill is-offline" id="statusPill">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusLabel">OFFLINE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== MAIN VIEW ======================== -->
+  <div class="view-main" id="viewMain">
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-before" id="beforeLayer"><img id="beforeImage" alt="Before preview"></div>
+      <div class="canvas-after" id="afterLayer"><img id="previewImage" alt="After preview"></div>
+      <div class="canvas-placeholder" id="canvasPlaceholder">
+        <div class="canvas-grid"></div>
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="opacity:0.25;position:relative;z-index:1;">
+          <rect x="4" y="4" width="20" height="20" rx="3" stroke="#7c6ef5" stroke-width="1.5"/>
+          <path d="M4 18l6-5 5 4 3-3 6 5" stroke="#7c6ef5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="10" cy="11" r="2" fill="#7c6ef5" opacity="0.6"/>
         </svg>
-      </button>
+        <div class="canvas-label" id="canvasLabel" style="position:relative;z-index:1;">No active selection</div>
+      </div>
+      <div class="scan-overlay" id="scanOverlay"></div>
+      <div class="canvas-overlay">
+        <div class="canvas-badge" id="dimensionBadge">1024 × 1024</div>
+        <div class="canvas-badge" id="modeBadge">TXT</div>
+      </div>
+      <div class="ba-bar">
+        <button class="ba-btn active" id="beforeBtn" type="button">Before</button>
+        <button class="ba-btn" id="afterBtn" type="button">After</button>
+      </div>
     </div>
 
-    <button class="generate-btn" id="generateBtn" type="button" disabled>
-      <div class="btn-inner">
-        <svg class="btn-icon" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" fill="white" opacity="0.9"/>
-          <path d="M13 2l.8 1.7L15.5 4.5l-1.7.8L13 7l-.8-1.7L10.5 4.5l1.7-.8L13 2z" fill="white" opacity="0.5"/>
-        </svg>
-        <span id="generateLabel">Generate</span>
+    <div class="tabs">
+      <button class="tab active" id="tabGenerate" type="button">Generate</button>
+      <button class="tab" id="tabInpaint" type="button">Inpaint</button>
+      <button class="tab" id="tabExpand" type="button">Expand</button>
+      <button class="tab" id="tabHistory" type="button">History</button>
+    </div>
+
+    <div class="body">
+      <div class="active-prompt" id="activePromptCard">
+        <div class="active-prompt-label">Active Prompt</div>
+        <div class="active-prompt-text" id="activePromptText"></div>
       </div>
-    </button>
 
-    <div class="message-inline" id="errorMessage" role="status" aria-live="polite"></div>
-    <select id="settingModel" hidden></select>
+      <!-- Model Selector -->
+      <div class="section-label">Model</div>
+      <div class="model-selector-card" id="modelSelectorCard">
+        <div class="model-selector-top">
+          <select class="model-select" id="settingModel">
+            <option value="">No models available</option>
+          </select>
+          <span class="model-family-badge" id="modelFamilyBadge">—</span>
+        </div>
+        <div class="model-selector-sub" id="modelSelectorSub">Select a model to start generating</div>
+      </div>
+
+      <div class="prompt-wrap" id="promptWrap">
+        <div class="prompt-label">Prompt</div>
+        <textarea class="prompt-box" id="promptInput" maxlength="512" placeholder="Describe what to generate..."></textarea>
+        <div class="prompt-footer">
+          <div class="prompt-helper">Describe the image you want to create or edit.</div>
+          <div class="char-count"><span id="charCount">0</span> / 512</div>
+        </div>
+      </div>
+
+      <div class="progress-area" id="progressArea">
+        <div class="progress-top">
+          <div class="progress-label">Diffusion Progress</div>
+          <div class="progress-pct" id="progressPct">0%</div>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+        <div class="progress-sub" id="progressSub">Waiting for generation.</div>
+      </div>
+
+      <div class="gen-stats" id="generationStats">
+        <div class="gen-stat-card">
+          <div class="gen-stat-label">Speed</div>
+          <div class="gen-stat-value" id="speedValue">--</div>
+          <div class="gen-stat-sub">it/s</div>
+        </div>
+        <div class="gen-stat-card">
+          <div class="gen-stat-label">ETA</div>
+          <div class="gen-stat-value" id="etaValue">--</div>
+          <div class="gen-stat-sub">remain</div>
+        </div>
+        <div class="gen-stat-card">
+          <div class="gen-stat-label">Batch</div>
+          <div class="gen-stat-value" id="batchValue">1/1</div>
+          <div class="gen-stat-sub">images</div>
+        </div>
+      </div>
+
+      <button class="cancel-btn" id="cancelBtn" type="button">Cancel Generation</button>
+
+      <div class="section-label">Parameters</div>
+      <div class="params-grid">
+        <div class="param-card" id="strengthCard">
+          <div class="param-label" id="strengthLabel">Strength</div>
+          <input type="range" class="param-slider" id="settingStrength" min="5" max="100" value="72">
+          <div class="param-val"><span class="pv" id="strengthValue">72%</span><span id="strengthHint">Denoising</span></div>
+        </div>
+        <div class="param-card">
+          <div class="param-label">Guidance</div>
+          <input type="range" class="param-slider" id="settingGuidance" min="0" max="200" value="75">
+          <div class="param-val"><span class="pv" id="guidanceValue">7.5</span><span>CFG Scale</span></div>
+        </div>
+        <div class="param-card">
+          <div class="param-label">Steps</div>
+          <input type="range" class="param-slider" id="settingSteps" min="1" max="100" value="28">
+          <div class="param-val"><span class="pv" id="stepsValue">28</span><span>Inference</span></div>
+        </div>
+        <div class="param-card" id="resolutionCard">
+          <div class="param-label" id="detailLabel">Resolution</div>
+          <input type="range" class="param-slider" id="settingResolution" min="512" max="2048" step="64" value="1024">
+          <div class="param-val"><span class="pv" id="resolutionValue">1024</span><span id="detailHint">Square</span></div>
+        </div>
+      </div>
+
+      <div class="section-label">Seed</div>
+      <div class="seed-row">
+        <input class="seed-input" id="settingSeed" type="text" placeholder="Random" value="-1">
+        <button class="seed-dice" id="seedDice" type="button">⚄</button>
+      </div>
+
+      <div class="section-label">Output</div>
+      <div class="layer-row">
+        <select class="layer-select" id="layerRouting">
+          <option value="new_layer">New layer above selection</option>
+          <option value="replace_canvas">Replace active layer</option>
+          <option value="new_mask">Add as mask review layer</option>
+        </select>
+        <button class="icon-btn" id="refreshBtn" type="button" title="Refresh models and status">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="applyBtn" type="button" title="Apply result" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M18.1716 1C18.702 1 19.2107 1.21071 19.5858 1.58579L22.4142 4.41421C22.7893 4.78929 23 5.29799 23 5.82843V20C23 21.6569 21.6569 23 20 23H4C2.34315 23 1 21.6569 1 20V4C1 2.34315 2.34315 1 4 1H18.1716ZM4 3C3.44772 3 3 3.44772 3 4V20C3 20.5523 3.44772 21 4 21L5 21L5 15C5 13.3431 6.34315 12 8 12L16 12C17.6569 12 19 13.3431 19 15V21H20C20.5523 21 21 20.5523 21 20V6.82843C21 6.29799 20.7893 5.78929 20.4142 5.41421L18.5858 3.58579C18.2107 3.21071 17.702 3 17.1716 3H17V5C17 6.65685 15.6569 8 14 8H10C8.34315 8 7 6.65685 7 5V3H4ZM17 21V15C17 14.4477 16.5523 14 16 14L8 14C7.44772 14 7 14.4477 7 15L7 21L17 21ZM9 3H15V5C15 5.55228 14.5523 6 14 6H10C9.44772 6 9 5.55228 9 5V3Z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+
+      <button class="generate-btn" id="generateBtn" type="button" disabled>
+        <div class="btn-inner">
+          <svg class="btn-icon" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" fill="white" opacity="0.9"/>
+            <path d="M13 2l.8 1.7L15.5 4.5l-1.7.8L13 7l-.8-1.7L10.5 4.5l1.7-.8L13 2z" fill="white" opacity="0.5"/>
+          </svg>
+          <span id="generateLabel">Generate</span>
+        </div>
+      </button>
+
+      <div class="message-inline" id="errorMessage" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="vram-row">
+      <div class="vram-label">VRAM</div>
+      <div class="vram-track"><div class="vram-fill" id="vramFill"></div></div>
+      <div class="vram-val" id="gpuInfo">--</div>
+    </div>
+
+    <div class="history-strip" id="historyStrip">
+      <button class="hist-add" id="saveHistoryBtn" type="button">+</button>
+    </div>
   </div>
 
-  <div class="vram-row">
-    <div class="vram-label">VRAM</div>
-    <div class="vram-track"><div class="vram-fill" id="vramFill"></div></div>
-    <div class="vram-val" id="gpuInfo">--</div>
-  </div>
+  <!-- ======================== LIBRARY VIEW ======================== -->
+  <div class="view-library" id="viewLibrary">
+    <div class="library-header">
+      <button class="library-back-btn" id="libraryBackBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Back
+      </button>
+      <h2 class="library-title">Model Library</h2>
+    </div>
 
-  <div class="history-strip" id="historyStrip">
-    <button class="hist-add" id="saveHistoryBtn" type="button">+</button>
+    <div class="library-components" id="libraryComponents">
+      <div class="library-section-label">Shared Components</div>
+      <div class="library-component-list" id="componentList">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="library-families" id="libraryFamilies">
+      <!-- Populated by JS: one section per model family -->
+    </div>
+
+    <!-- Download progress overlay -->
+    <div class="download-overlay" id="downloadOverlay">
+      <div class="download-overlay-inner">
+        <div class="download-overlay-label" id="downloadLabel">Downloading...</div>
+        <div class="progress-track">
+          <div class="progress-fill download-fill" id="downloadFill" style="width: 0%;"></div>
+        </div>
+        <div class="download-overlay-sub" id="downloadSub">Preparing...</div>
+      </div>
+    </div>
   </div>
 </div>
 <script src="index.js"></script>

@@ -1,16 +1,17 @@
-﻿const { app, action, core, imaging } = require("photoshop");
+const { app, action, core, imaging } = require("photoshop");
 const { storage } = require("uxp");
 
 const SERVER_URLS = ["http://127.0.0.1:5000", "http://localhost:5000"];
 const HEALTH_POLL_MS = 3000;
 const PROGRESS_POLL_MS = 450;
+const DOWNLOAD_POLL_MS = 800;
 const MAX_HISTORY = 8;
 const STORAGE_KEYS = {
   history: "oddity.history.v3",
 };
 
 const MODE_CONFIG = {
-  generate: { label: "Generate", usesCanvas: true, modeBadge: "FILL", canvasLabel: "Use the active selection as your generative fill guide" },
+  generate: { label: "Generate", usesCanvas: false, modeBadge: "TXT", canvasLabel: "Text-to-image generation" },
   inpaint: { label: "Inpaint", usesCanvas: true, modeBadge: "MASK", canvasLabel: "Repair details inside the active selection" },
   outpaint: { label: "Expand", usesCanvas: true, modeBadge: "EXP", canvasLabel: "Expand the Photoshop canvas before generating" },
 };
@@ -28,10 +29,14 @@ const state = {
   history: loadStored(STORAGE_KEYS.history, []),
   healthInterval: null,
   progressInterval: null,
+  downloadInterval: null,
   progressStartedAt: 0,
   progressLastStep: 0,
   historyFlashTimer: null,
   messageTimer: null,
+  currentView: "main", // "main" | "library"
+  registry: null,
+  readyModels: [],
 };
 
 function $(id) {
@@ -98,6 +103,19 @@ function bindDom() {
     historyStrip: $("historyStrip"),
     saveHistoryBtn: $("saveHistoryBtn"),
     settingModel: $("settingModel"),
+    modelFamilyBadge: $("modelFamilyBadge"),
+    modelSelectorSub: $("modelSelectorSub"),
+    // Library view
+    viewMain: $("viewMain"),
+    viewLibrary: $("viewLibrary"),
+    viewLibraryBtn: $("viewLibraryBtn"),
+    libraryBackBtn: $("libraryBackBtn"),
+    libraryFamilies: $("libraryFamilies"),
+    componentList: $("componentList"),
+    downloadOverlay: $("downloadOverlay"),
+    downloadLabel: $("downloadLabel"),
+    downloadFill: $("downloadFill"),
+    downloadSub: $("downloadSub"),
   });
 }
 
@@ -220,7 +238,7 @@ function updateModeUI() {
 function updateGenerateAvailability() {
   const hasPrompt = Boolean(getPromptValue().trim());
   const hasModel = Boolean(dom.settingModel.value);
-  dom.generateBtn.disabled = !(hasPrompt && hasModel && state.modelReady && !state.isGenerating);
+  dom.generateBtn.disabled = !(hasPrompt && hasModel && state.serverConnected && !state.isGenerating);
 }
 
 function updateDimensionBadge(width, height) {
@@ -230,6 +248,58 @@ function updateDimensionBadge(width, height) {
 function randomSeed() {
   dom.settingSeed.value = String(Math.floor(Math.random() * 9999999));
 }
+
+// ---------------------------------------------------------------------------
+// Model selector
+// ---------------------------------------------------------------------------
+
+function getSelectedModel() {
+  const val = dom.settingModel.value;
+  if (!val) return null;
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateModelBadge() {
+  const model = getSelectedModel();
+  if (model) {
+    dom.modelFamilyBadge.textContent = model.family_display || model.family.toUpperCase();
+    dom.modelFamilyBadge.style.background = model.badge_color || "#7C8CFF";
+    dom.modelSelectorSub.textContent = model.name;
+    // Apply model defaults to sliders
+    if (model.default_steps) {
+      dom.settingSteps.value = String(model.default_steps);
+    }
+    if (model.default_guidance !== undefined) {
+      dom.settingGuidance.value = String(Math.round(model.default_guidance * 10));
+    }
+    syncSliders();
+  } else {
+    dom.modelFamilyBadge.textContent = "—";
+    dom.modelFamilyBadge.style.background = "rgba(255,255,255,0.08)";
+    dom.modelSelectorSub.textContent = "Select a model to start generating";
+  }
+  updateGenerateAvailability();
+}
+
+// ---------------------------------------------------------------------------
+// View switching
+// ---------------------------------------------------------------------------
+
+function switchView(view) {
+  state.currentView = view;
+  dom.body.dataset.view = view;
+  if (view === "library") {
+    loadRegistry();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
 
 function renderHistory() {
   dom.historyStrip.innerHTML = "";
@@ -241,7 +311,7 @@ function renderHistory() {
     if (state.lastGeneratedImage && state.lastGeneratedImage.base64 === entry.image) {
       button.classList.add("active");
     }
-    button.title = entry.prompt || MODE_CONFIG[entry.mode].label;
+    button.title = entry.prompt || MODE_CONFIG[entry.mode]?.label || "Generation";
     button.innerHTML = `<div class="hist-thumb-inner"><img src="data:image/png;base64,${entry.image}" alt="History preview"></div>`;
     button.addEventListener("click", () => restoreHistory(entry));
     dom.historyStrip.appendChild(button);
@@ -269,9 +339,14 @@ function restoreHistory(entry) {
   dom.settingResolution.value = String(entry.resolution || 1024);
   dom.settingSeed.value = String(entry.seed ?? -1);
   dom.layerRouting.value = entry.route || "new_layer";
-  if (entry.model && [...dom.settingModel.options].some((option) => option.value === entry.model)) {
-    dom.settingModel.value = entry.model;
+  
+  // Restore model selection if available
+  if (entry.modelValue) {
+    const options = [...dom.settingModel.options];
+    const match = options.find((o) => o.value === entry.modelValue);
+    if (match) dom.settingModel.value = entry.modelValue;
   }
+  
   state.beforeImage = entry.beforeImage || null;
   state.lastGeneratedImage = { base64: entry.image, width: entry.width, height: entry.height };
   dom.previewImage.src = `data:image/png;base64,${entry.image}`;
@@ -282,6 +357,7 @@ function restoreHistory(entry) {
     state.compareMode = "after";
   }
   updateDimensionBadge(entry.width || 1024, entry.height || 1024);
+  updateModelBadge();
   updateModeUI();
   updateCharCount();
   updateCanvasState();
@@ -304,12 +380,16 @@ function pushHistory(result, seed, width, height) {
     steps: Number(dom.settingSteps.value),
     resolution: Number(dom.settingResolution.value),
     route: dom.layerRouting.value,
-    model: dom.settingModel.value,
+    modelValue: dom.settingModel.value,
   };
   state.history = [entry, ...state.history].slice(0, MAX_HISTORY);
   saveStored(STORAGE_KEYS.history, state.history);
   renderHistory();
 }
+
+// ---------------------------------------------------------------------------
+// Server communication
+// ---------------------------------------------------------------------------
 
 async function serverFetch(endpoint, options = {}) {
   const candidates = [state.serverUrl, ...SERVER_URLS.filter((url) => url !== state.serverUrl)];
@@ -340,49 +420,221 @@ async function serverFetch(endpoint, options = {}) {
   throw lastError || new Error("Unable to reach local server.");
 }
 
+// ---------------------------------------------------------------------------
+// Model listing
+// ---------------------------------------------------------------------------
+
 async function loadModels() {
   try {
     const models = await serverFetch("/models");
+    state.readyModels = models;
+    const previousValue = dom.settingModel.value;
     dom.settingModel.innerHTML = "";
+    
     if (!models.length) {
-      dom.settingModel.innerHTML = '<option value="">No local models found</option>';
-      updateGenerateAvailability();
+      dom.settingModel.innerHTML = '<option value="">No models ready — open Library to download</option>';
+      updateModelBadge();
       return;
     }
 
-    models.forEach((model) => {
-      const option = document.createElement("option");
-      option.value = model;
-      option.textContent = model;
-      dom.settingModel.appendChild(option);
+    // Group by family
+    const grouped = {};
+    models.forEach((m) => {
+      if (!grouped[m.family]) grouped[m.family] = { display: m.family_display, models: [] };
+      grouped[m.family].models.push(m);
     });
 
-    if (!dom.settingModel.value) {
-      dom.settingModel.value = models[0];
+    Object.entries(grouped).forEach(([famId, group]) => {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = group.display;
+      group.models.forEach((m) => {
+        const option = document.createElement("option");
+        option.value = JSON.stringify({ family: m.family, family_display: m.family_display, id: m.id, name: m.name, default_steps: m.default_steps, default_guidance: m.default_guidance, badge_color: m.badge_color });
+        option.textContent = `${m.name}${m.is_inpaint_model ? " (Inpaint)" : ""}`;
+        optgroup.appendChild(option);
+      });
+      dom.settingModel.appendChild(optgroup);
+    });
+
+    // Restore previous selection or select first
+    if (previousValue) {
+      const options = [...dom.settingModel.querySelectorAll("option")];
+      const match = options.find((o) => o.value === previousValue);
+      if (match) {
+        dom.settingModel.value = previousValue;
+      }
     }
-    updateGenerateAvailability();
+    if (!dom.settingModel.value) {
+      dom.settingModel.value = dom.settingModel.querySelector("option")?.value || "";
+    }
+    updateModelBadge();
   } catch (error) {
     dom.settingModel.innerHTML = '<option value="">Model list unavailable</option>';
-    updateGenerateAvailability();
+    updateModelBadge();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Registry & Library
+// ---------------------------------------------------------------------------
+
+async function loadRegistry() {
+  try {
+    const registry = await serverFetch("/registry");
+    state.registry = registry;
+    renderLibrary(registry);
+  } catch (error) {
+    console.warn("Failed to load registry:", error);
+    dom.libraryFamilies.innerHTML = '<div class="library-empty">Could not load registry. Is the server running?</div>';
+  }
+}
+
+function renderLibrary(registry) {
+  // Render components
+  dom.componentList.innerHTML = "";
+  Object.entries(registry.components || {}).forEach(([compId, comp]) => {
+    const card = document.createElement("div");
+    card.className = `library-component-card ${comp.downloaded ? "is-downloaded" : "is-missing"}`;
+    card.innerHTML = `
+      <div class="lcc-info">
+        <div class="lcc-name">${comp.display_name}</div>
+        <div class="lcc-detail">${comp.size_gb} GB${comp.shared ? " · Shared" : ""}</div>
+      </div>
+      <div class="lcc-status">${comp.downloaded ? "✓ Ready" : "Not downloaded"}</div>
+    `;
+    dom.componentList.appendChild(card);
+  });
+
+  // Render families
+  dom.libraryFamilies.innerHTML = "";
+  Object.entries(registry.families || {}).forEach(([famId, fam]) => {
+    const section = document.createElement("div");
+    section.className = "library-family-section";
+
+    let modelsHtml = "";
+    (fam.models || []).forEach((model) => {
+      const statusClass = model.ready ? "is-ready" : model.downloaded ? "is-partial" : "is-not-downloaded";
+      const statusText = model.ready ? "Ready" : model.downloaded ? "Missing dependencies" : "Not downloaded";
+      const canDownload = !model.ready && (model.download_url || (model.missing_deps || []).some((d) => d.type === "component"));
+      const hasUrl = model.download_url || (model.missing_deps || []).every((d) => d.type === "component");
+
+      modelsHtml += `
+        <div class="library-model-card ${statusClass}" data-family="${famId}" data-model-id="${model.id}">
+          <div class="lmc-top">
+            <div class="lmc-name">${model.name}</div>
+            <span class="lmc-badge" style="background:${fam.badge_color}">${fam.display_name}</span>
+          </div>
+          <div class="lmc-desc">${model.description || ""}</div>
+          <div class="lmc-bottom">
+            <span class="lmc-size">${model.size_gb ? model.size_gb + " GB" : ""}</span>
+            <span class="lmc-status">${statusText}</span>
+            ${canDownload && hasUrl ? `<button class="lmc-download-btn" data-family="${famId}" data-model-id="${model.id}" type="button">Download</button>` : ""}
+            ${!canDownload && !model.ready && !hasUrl ? `<span class="lmc-manual">Manual download required</span>` : ""}
+          </div>
+        </div>
+      `;
+    });
+
+    section.innerHTML = `
+      <div class="library-section-label">
+        <span class="lsl-badge" style="background:${fam.badge_color}">${fam.display_name}</span>
+        <span class="lsl-desc">${fam.description || ""}</span>
+      </div>
+      <div class="library-section-info">
+        VRAM: ${fam.min_vram_gb}GB min · ${fam.recommended_vram_gb}GB recommended
+      </div>
+      <div class="library-model-list">${modelsHtml}</div>
+    `;
+    dom.libraryFamilies.appendChild(section);
+  });
+
+  // Bind download buttons
+  document.querySelectorAll(".lmc-download-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const family = btn.dataset.family;
+      const modelId = btn.dataset.modelId;
+      startModelDownload(family, modelId);
+    });
+  });
+}
+
+async function startModelDownload(family, modelId) {
+  try {
+    await serverFetch("/models/download", {
+      method: "POST",
+      body: JSON.stringify({ family, model_id: modelId }),
+    });
+    showDownloadOverlay(true);
+    startDownloadPolling();
+  } catch (error) {
+    showMessage(`Download failed: ${error.message}`, "error", 5000);
+  }
+}
+
+function showDownloadOverlay(visible) {
+  dom.downloadOverlay.classList.toggle("visible", visible);
+}
+
+function startDownloadPolling() {
+  stopDownloadPolling();
+  state.downloadInterval = setInterval(async () => {
+    try {
+      const progress = await serverFetch("/models/download/progress");
+      dom.downloadLabel.textContent = `Downloading: ${progress.item || "..."}`;
+      dom.downloadFill.style.width = `${progress.percent || 0}%`;
+      
+      const mb = Math.round((progress.bytes_downloaded || 0) / 1024 / 1024);
+      const totalMb = Math.round((progress.bytes_total || 0) / 1024 / 1024);
+      dom.downloadSub.textContent = totalMb > 0 ? `${mb} / ${totalMb} MB (${progress.percent}%)` : `${mb} MB downloaded`;
+      
+      if (!progress.active || progress.status === "complete") {
+        stopDownloadPolling();
+        showDownloadOverlay(false);
+        showMessage("Download complete! Model is now available.", "success");
+        await loadModels();
+        await loadRegistry();
+      } else if (progress.status && progress.status.startsWith("error")) {
+        stopDownloadPolling();
+        showDownloadOverlay(false);
+        showMessage(`Download failed: ${progress.status}`, "error", 6000);
+      }
+    } catch (error) {
+      console.warn("Download polling failed", error);
+    }
+  }, DOWNLOAD_POLL_MS);
+}
+
+function stopDownloadPolling() {
+  if (state.downloadInterval) {
+    clearInterval(state.downloadInterval);
+    state.downloadInterval = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
 
 async function checkHealth() {
   try {
     const data = await serverFetch("/health");
     state.serverConnected = true;
-    state.modelReady = data.model_status === "ready" || data.model_status === "ready_base";
+    state.modelReady = data.model_status === "ready";
 
     if (data.model_status === "error") {
       setStatus("error", "ERROR", "Model failed to load");
-    } else if ((data.model_status || "").includes("loading")) {
-      setStatus("starting", "STARTING", `Model status: ${data.model_status}`);
+    } else if (data.model_status === "loading") {
+      const family = data.current_family ? data.current_family.toUpperCase() : "";
+      setStatus("starting", "LOADING", `Loading ${family} pipeline...`);
     } else if (state.isGenerating) {
-      setStatus("generating", "FLUX", `Sampling locally on ${data.current_model || "selected weights"}`);
-    } else if (state.modelReady) {
-      setStatus("ready", "LOCAL", data.current_model || "Base pipeline loaded locally");
+      const family = data.current_family ? data.current_family.toUpperCase() : "AI";
+      setStatus("generating", family, `Sampling locally on ${data.current_model || "selected model"}`);
+    } else if (data.model_status === "ready") {
+      const family = data.current_family ? data.current_family.toUpperCase() : "LOCAL";
+      setStatus("ready", family, data.current_model || "Model loaded locally");
     } else {
-      setStatus("starting", "STARTING", data.model_status || "Warming up");
+      setStatus("ready", "IDLE", "Server ready — select a model to begin");
     }
 
     if (data.gpu && data.gpu.name) {
@@ -409,6 +661,10 @@ async function checkHealth() {
     updateGenerateAvailability();
   }
 }
+
+// ---------------------------------------------------------------------------
+// Canvas capture
+// ---------------------------------------------------------------------------
 
 async function captureCanvas() {
   const doc = app.activeDocument;
@@ -454,6 +710,62 @@ async function captureCanvas() {
   return base64Image;
 }
 
+async function captureMask() {
+  // Capture the current selection as a mask (white = selected, black = unselected)
+  const doc = app.activeDocument;
+  if (!doc) throw new Error("Open a Photoshop document first.");
+
+  let base64Mask = null;
+
+  await core.executeAsModal(async () => {
+    // Create a temporary channel from selection
+    try {
+      // Save selection to channel, capture it, then remove
+      await action.batchPlay([
+        {
+          _obj: "set",
+          _target: [{ _ref: "channel", _property: "selection" }],
+          to: { _ref: "channel", _enum: "channel", _value: "transparencyEnum" },
+        },
+      ], { modalBehavior: "execute" });
+    } catch (e) {
+      // If no selection exists, create a full white mask
+    }
+
+    const tempFolder = await storage.localFileSystem.getTemporaryFolder();
+    const tempFile = await tempFolder.createFile("oddity_mask.png", { overwrite: true });
+
+    await action.batchPlay([
+      {
+        _obj: "save",
+        as: {
+          _obj: "PNGFormat",
+          PNGInterlaceType: { _enum: "PNGInterlaceType", _value: "PNGInterlaceNone" },
+          compression: 6,
+        },
+        in: { _path: tempFile.nativePath, _kind: "local" },
+        copy: true,
+        lowerCase: true,
+        embedProfiles: false,
+      },
+    ], { modalBehavior: "execute" });
+
+    const fileData = await tempFile.read({ format: storage.formats.binary });
+    const bytes = new Uint8Array(fileData);
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 1) {
+      binary += String.fromCharCode(bytes[index]);
+    }
+    base64Mask = btoa(binary);
+  }, { commandName: "Oddity: Capture Mask" });
+
+  return base64Mask;
+}
+
+// ---------------------------------------------------------------------------
+// Layer operations
+// ---------------------------------------------------------------------------
+
 async function applyAsNewLayer(base64Png, layerName = "Oddity Result") {
   const doc = app.activeDocument;
   if (!doc) throw new Error("Open a Photoshop document first.");
@@ -493,6 +805,10 @@ async function replaceCanvas(base64Png) {
   }, { commandName: "Oddity: Flatten Result" });
 }
 
+// ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
 function humanizeError(message) {
   const lower = String(message || "").toLowerCase();
   if (lower.includes("out of memory") || lower.includes("cuda") || lower.includes("vram")) {
@@ -501,8 +817,15 @@ function humanizeError(message) {
   if (lower.includes("capture") || lower.includes("document")) {
     return "Photoshop could not capture the current document. Make sure a document is open.";
   }
+  if (lower.includes("not found")) {
+    return "Model file not found. Please download it from the Model Library first.";
+  }
   return message;
 }
+
+// ---------------------------------------------------------------------------
+// Progress tracking
+// ---------------------------------------------------------------------------
 
 function updateProgress(step, total) {
   const pct = total > 0 ? Math.round((step / total) * 100) : 0;
@@ -543,15 +866,20 @@ function stopProgressPolling() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Generation
+// ---------------------------------------------------------------------------
+
 async function runGeneration() {
-  if (state.isGenerating || !state.modelReady) return;
+  if (state.isGenerating) return;
   const prompt = getPromptValue().trim();
   if (!prompt) {
     showMessage("Enter a prompt before generating.", "error");
     return;
   }
-  if (!dom.settingModel.value) {
-    showMessage("No local model is selected yet.", "error");
+  const model = getSelectedModel();
+  if (!model) {
+    showMessage("No model selected. Open the Model Library to download one.", "error");
     return;
   }
 
@@ -562,7 +890,8 @@ async function runGeneration() {
   dom.applyBtn.disabled = true;
   const mode = getEffectiveMode();
   const usesCanvas = MODE_CONFIG[mode].usesCanvas;
-  setStatus("generating", "FLUX", `Preparing ${MODE_CONFIG[mode].label.toLowerCase()} request`);
+  const familyLabel = model.family_display || model.family.toUpperCase();
+  setStatus("generating", familyLabel, `Preparing ${MODE_CONFIG[mode].label.toLowerCase()} request`);
   dom.activePromptText.textContent = prompt;
   updateButtons();
   updateModeUI();
@@ -570,6 +899,7 @@ async function runGeneration() {
 
   try {
     let sourceBase64 = null;
+    let maskBase64 = null;
     let width = Number(dom.settingResolution.value);
     let height = Number(dom.settingResolution.value);
 
@@ -578,6 +908,14 @@ async function runGeneration() {
       state.beforeImage = sourceBase64;
       dom.beforeImage.src = `data:image/png;base64,${sourceBase64}`;
       dom.progressSub.textContent = "Capturing the active Photoshop document.";
+
+      if (mode === "inpaint") {
+        try {
+          maskBase64 = await captureMask();
+        } catch (e) {
+          console.warn("Could not capture mask, using full image:", e);
+        }
+      }
     } else {
       state.beforeImage = null;
       dom.beforeImage.removeAttribute("src");
@@ -586,27 +924,48 @@ async function runGeneration() {
     updateCanvasState();
     startProgressPolling();
 
-    const body = usesCanvas
-      ? {
-          model_name: dom.settingModel.value,
-          prompt,
-          image: sourceBase64,
-          strength: Number(dom.settingStrength.value) / 100,
-          num_steps: Number(dom.settingSteps.value),
-          guidance_scale: Number(dom.settingGuidance.value) / 10,
-          seed: parseInt(dom.settingSeed.value, 10) || -1,
-        }
-      : {
-          model_name: dom.settingModel.value,
-          prompt,
-          width,
-          height,
-          num_steps: Number(dom.settingSteps.value),
-          guidance_scale: Number(dom.settingGuidance.value) / 10,
-          seed: parseInt(dom.settingSeed.value, 10) || -1,
-        };
+    let endpoint;
+    let body;
 
-    const endpoint = usesCanvas ? "/img2img" : "/generate";
+    if (mode === "inpaint" && maskBase64) {
+      endpoint = "/inpaint";
+      body = {
+        family: model.family,
+        model_id: model.id,
+        prompt,
+        image: sourceBase64,
+        mask: maskBase64,
+        strength: Number(dom.settingStrength.value) / 100,
+        num_steps: Number(dom.settingSteps.value),
+        guidance_scale: Number(dom.settingGuidance.value) / 10,
+        seed: parseInt(dom.settingSeed.value, 10) || -1,
+      };
+    } else if (usesCanvas) {
+      endpoint = "/img2img";
+      body = {
+        family: model.family,
+        model_id: model.id,
+        prompt,
+        image: sourceBase64,
+        strength: Number(dom.settingStrength.value) / 100,
+        num_steps: Number(dom.settingSteps.value),
+        guidance_scale: Number(dom.settingGuidance.value) / 10,
+        seed: parseInt(dom.settingSeed.value, 10) || -1,
+      };
+    } else {
+      endpoint = "/generate";
+      body = {
+        family: model.family,
+        model_id: model.id,
+        prompt,
+        width,
+        height,
+        num_steps: Number(dom.settingSteps.value),
+        guidance_scale: Number(dom.settingGuidance.value) / 10,
+        seed: parseInt(dom.settingSeed.value, 10) || -1,
+      };
+    }
+
     const result = await serverFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
 
     state.lastGeneratedImage = { base64: result.image, width: result.width, height: result.height };
@@ -615,7 +974,7 @@ async function runGeneration() {
     updateDimensionBadge(result.width, result.height);
     updateCanvasState();
     pushHistory(result, result.seed, result.width, result.height);
-    setStatus("ready", "LOCAL", `Render ready · seed ${result.seed}`);
+    setStatus("ready", familyLabel, `Render ready · seed ${result.seed}`);
     dom.applyBtn.disabled = false;
     showMessage("Generation complete.", "success");
   } catch (error) {
@@ -668,6 +1027,10 @@ function flashHistoryTab() {
   showMessage(state.history.length ? "Tap a thumbnail below to restore a render." : "No history yet. Renders appear here after generation.");
 }
 
+// ---------------------------------------------------------------------------
+// Event binding
+// ---------------------------------------------------------------------------
+
 function initEvents() {
   dom.promptInput.addEventListener("input", updateCharCount);
   dom.promptInput.addEventListener("keydown", (event) => {
@@ -700,17 +1063,27 @@ function initEvents() {
     updateDimensionBadge(dom.settingResolution.value, dom.settingResolution.value);
   });
   dom.seedDice.addEventListener("click", randomSeed);
+  dom.settingModel.addEventListener("change", updateModelBadge);
+  
   dom.refreshBtn.addEventListener("click", async () => {
     await checkHealth();
     await loadModels();
-    showMessage("Local model status refreshed.", "success", 1800);
+    showMessage("Model status refreshed.", "success", 1800);
   });
   dom.generateBtn.addEventListener("click", runGeneration);
   dom.applyBtn.addEventListener("click", applyResult);
   dom.cancelBtn.addEventListener("click", () => {
     showMessage("Cancel is not available in the current backend yet.", "error", 4200);
   });
+
+  // View switching
+  dom.viewLibraryBtn.addEventListener("click", () => switchView("library"));
+  dom.libraryBackBtn.addEventListener("click", () => switchView("main"));
 }
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
 
 function init() {
   bindDom();
