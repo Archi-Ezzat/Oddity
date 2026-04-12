@@ -1,0 +1,60 @@
+{
+  "styles": [
+    {
+      "name": "Photorealistic",
+      "icon": "../SVG/photorealistic.svg",
+      "prefix": "photorealistic, 8k uhd, ultra detailed, sharp focus, professional photography, "
+    },
+    {
+      "name": "Cinematic",
+      "icon": "../SVG/cinematic.svg",
+      "prefix": "cinematic film still, dramatic lighting, anamorphic lens, color graded, "
+    },
+    {
+      "name": "Anime",
+      "icon": "../SVG/anime.svg",
+      "prefix": "anime style, cel shaded, vibrant colors, studio ghibli inspired, "
+    },
+    {
+      "name": "Oil Painting",
+      "icon": "../SVG/oil-painting.svg",
+      "prefix": "oil painting, masterwork, thick brushstrokes, rich texture, museum quality, "
+    },
+    {
+      "name": "Watercolor",
+      "icon": "../SVG/watercolor.svg",
+      "prefix": "watercolor painting, soft edges, flowing paint, delicate washes, "
+    },
+    {
+      "name": "3D Render",
+      "icon": "../SVG/3d-render.svg",
+      "prefix": "3D render, octane render, volumetric lighting, highly detailed, "
+    },
+    {
+      "name": "Pixel Art",
+      "icon": "../SVG/pixel-art.svg",
+      "prefix": "pixel art, retro game style, 16-bit, crisp pixels, "
+    },
+    {
+      "name": "Sketch",
+      "icon": "../SVG/sketch.svg",
+      "prefix": "pencil sketch, detailed linework, crosshatching, graphite on paper, "
+    },
+    {
+      "name": "Fantasy",
+      "icon": "../SVG/fantasy.svg",
+      "prefix": "epic fantasy art, detailed illustration, magical atmosphere, "
+    },
+    {
+      "name": "Noir",
+      "icon": "../SVG/noir.svg",
+      "prefix": "film noir style, high contrast black and white, dramatic shadows, moody, "
+    }
+  ],
+  "negative_defaults": {
+    "sd15": "ugly, blurry, bad anatomy, worst quality, low quality, deformed, disfigured, mutated, extra limbs",
+    "sdxl": "ugly, deformed, noisy, blurry, low contrast, NSFW, worst quality, low quality",
+    "flux": "",
+    "sd3": "ugly, blurry, deformed, low quality"
+  }
+}

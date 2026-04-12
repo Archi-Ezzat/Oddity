@@ -4,17 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oddity AI</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Font: Uses system fonts (Inter fallback via CSS --font variable) -->
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-status="offline" data-mode="generate" data-compare="after" data-view="main">
 <div class="panel">
   <div class="header">
     <div class="logo">
-      <div class="logo-mark" id="logoMark"></div>
+      <img src="../SVG/main icon/icon_48.png" class="logo-mark-img" id="logoMark" />
       <div>
         <div class="logo-text">Oddity AI</div>
-        <div class="logo-sub" id="logoSub">Local AI · Multi-Model</div>
       </div>
     </div>
     <div class="header-actions">
@@ -26,9 +25,29 @@
           <line x1="9" y1="11" x2="13" y2="11"/>
         </svg>
       </button>
+      <button class="header-icon-btn" id="settingsToggleBtn" type="button" title="Connection Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
       <div class="status-pill is-offline" id="statusPill">
         <div class="dot" id="statusDot"></div>
         <span id="statusLabel">OFFLINE</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-content">
+      <div class="settings-title">Connection Settings</div>
+      <div class="settings-field">
+        <label for="serverUrlInput">Backend Server URL</label>
+        <div class="url-input-wrap">
+          <input type="text" id="serverUrlInput" placeholder="http://127.0.0.1:5000" />
+          <button class="connect-btn" id="connectBtn" type="button">Connect</button>
+        </div>
+        <div class="settings-help">Change this to your Google Colab / ngrok URL for remote processing.</div>
       </div>
     </div>
   </div>
@@ -36,8 +55,9 @@
   <!-- ======================== MAIN VIEW ======================== -->
   <div class="view-main" id="viewMain">
     <div class="canvas-area" id="canvasArea">
-      <div class="canvas-before" id="beforeLayer"><img id="beforeImage" alt="Before preview"></div>
-      <div class="canvas-after" id="afterLayer"><img id="previewImage" alt="After preview"></div>
+      <div class="canvas-after" id="afterLayer">
+        <div class="preview-grid" id="previewGrid"></div>
+      </div>
       <div class="canvas-placeholder" id="canvasPlaceholder">
         <div class="canvas-grid"></div>
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="opacity:0.25;position:relative;z-index:1;">
@@ -52,18 +72,9 @@
         <div class="canvas-badge" id="dimensionBadge">1024 × 1024</div>
         <div class="canvas-badge" id="modeBadge">TXT</div>
       </div>
-      <div class="ba-bar">
-        <button class="ba-btn active" id="beforeBtn" type="button">Before</button>
-        <button class="ba-btn" id="afterBtn" type="button">After</button>
-      </div>
     </div>
 
-    <div class="tabs">
-      <button class="tab active" id="tabGenerate" type="button">Generate</button>
-      <button class="tab" id="tabInpaint" type="button">Inpaint</button>
-      <button class="tab" id="tabExpand" type="button">Expand</button>
-      <button class="tab" id="tabHistory" type="button">History</button>
-    </div>
+
 
     <div class="body">
       <div class="active-prompt" id="activePromptCard">
@@ -72,26 +83,82 @@
       </div>
 
       <!-- Model Selector -->
-      <div class="section-label">Model</div>
-      <div class="model-selector-card" id="modelSelectorCard">
-        <div class="model-selector-top">
-          <select class="model-select" id="settingModel">
-            <option value="">No models available</option>
-          </select>
-          <span class="model-family-badge" id="modelFamilyBadge">—</span>
-        </div>
-        <div class="model-selector-sub" id="modelSelectorSub">Select a model to start generating</div>
-      </div>
-
-      <div class="prompt-wrap" id="promptWrap">
-        <div class="prompt-label">Prompt</div>
-        <textarea class="prompt-box" id="promptInput" maxlength="512" placeholder="Describe what to generate..."></textarea>
-        <div class="prompt-footer">
-          <div class="prompt-helper">Describe the image you want to create or edit.</div>
-          <div class="char-count"><span id="charCount">0</span> / 512</div>
+      <div class="section-block">
+        <div class="section-title">Model</div>
+        <div class="model-selector-card" id="modelSelectorCard">
+          <div class="model-selector-top">
+            <select class="model-select" id="settingModel">
+              <option value="">No models available</option>
+            </select>
+            <span class="model-family-badge" id="modelFamilyBadge">—</span>
+          </div>
+          <div class="model-selector-sub" id="modelSelectorSub">Select a model to start generating</div>
         </div>
       </div>
 
+      <!-- Prompt -->
+      <div class="section-block">
+        <div class="section-title">Prompt</div>
+        <div class="prompt-wrap" id="promptWrap">
+          <textarea class="prompt-box" id="promptInput" maxlength="512" placeholder="Describe what to generate..."></textarea>
+          <div class="prompt-footer">
+            <div class="prompt-helper">Describe the image you want to create or edit.</div>
+            <div class="char-count"><span id="charCount">0</span> / 512</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Style Presets -->
+      <div class="section-block">
+        <div class="section-title">Style</div>
+        <div class="style-chips" id="styleChips">
+          <!-- Populated by JS from prompt_library.json -->
+        </div>
+      </div>
+
+      <!-- Negative Prompt (Advanced) -->
+      <div class="section-block">
+        <button class="advanced-toggle" id="advancedToggle" type="button">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Advanced
+          <span class="toggle-arrow" id="toggleArrow">▸</span>
+        </button>
+        <div class="advanced-area" id="advancedArea">
+          <div class="neg-prompt-label">Negative Prompt</div>
+          <textarea class="neg-prompt-box" id="negativePromptInput" maxlength="512" placeholder="Things to avoid (auto-filled per model)..."></textarea>
+        </div>
+      </div>
+
+      <!-- Saved Prompts -->
+      <div class="section-block">
+        <div class="section-title-row">
+          <div class="section-title">Saved Prompts</div>
+          <button class="save-prompt-btn" id="savePromptBtn" type="button" title="Save current prompt">
+            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M14 0H2V16H4L8 12L12 16H14V0ZM7 3V5H5V7H7V9H9V7H11V5H9V3H7Z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+        <div class="saved-prompts" id="savedPrompts">
+          <div class="saved-prompts-empty">No saved prompts yet</div>
+        </div>
+      </div>
+
+      <!-- Variations -->
+      <div class="section-block">
+        <div class="section-title">Images</div>
+        <div class="variation-row" id="variationRow">
+          <button class="var-btn active" data-val="1" type="button">1</button>
+          <button class="var-btn" data-val="2" type="button">2</button>
+          <button class="var-btn" data-val="3" type="button">3</button>
+          <button class="var-btn" data-val="4" type="button">4</button>
+        </div>
+      </div>
+
+      <!-- Progress (shown during generation) -->
       <div class="progress-area" id="progressArea">
         <div class="progress-top">
           <div class="progress-label">Diffusion Progress</div>
@@ -123,43 +190,8 @@
 
       <button class="cancel-btn" id="cancelBtn" type="button">Cancel Generation</button>
 
-      <div class="section-label">Parameters</div>
-      <div class="params-grid">
-        <div class="param-card" id="strengthCard">
-          <div class="param-label" id="strengthLabel">Strength</div>
-          <input type="range" class="param-slider" id="settingStrength" min="5" max="100" value="72">
-          <div class="param-val"><span class="pv" id="strengthValue">72%</span><span id="strengthHint">Denoising</span></div>
-        </div>
-        <div class="param-card">
-          <div class="param-label">Guidance</div>
-          <input type="range" class="param-slider" id="settingGuidance" min="0" max="200" value="75">
-          <div class="param-val"><span class="pv" id="guidanceValue">7.5</span><span>CFG Scale</span></div>
-        </div>
-        <div class="param-card">
-          <div class="param-label">Steps</div>
-          <input type="range" class="param-slider" id="settingSteps" min="1" max="100" value="28">
-          <div class="param-val"><span class="pv" id="stepsValue">28</span><span>Inference</span></div>
-        </div>
-        <div class="param-card" id="resolutionCard">
-          <div class="param-label" id="detailLabel">Resolution</div>
-          <input type="range" class="param-slider" id="settingResolution" min="512" max="2048" step="64" value="1024">
-          <div class="param-val"><span class="pv" id="resolutionValue">1024</span><span id="detailHint">Square</span></div>
-        </div>
-      </div>
-
-      <div class="section-label">Seed</div>
-      <div class="seed-row">
-        <input class="seed-input" id="settingSeed" type="text" placeholder="Random" value="-1">
-        <button class="seed-dice" id="seedDice" type="button">⚄</button>
-      </div>
-
-      <div class="section-label">Output</div>
-      <div class="layer-row">
-        <select class="layer-select" id="layerRouting">
-          <option value="new_layer">New layer above selection</option>
-          <option value="replace_canvas">Replace active layer</option>
-          <option value="new_mask">Add as mask review layer</option>
-        </select>
+      <!-- Action buttons row -->
+      <div class="action-row">
         <button class="icon-btn" id="refreshBtn" type="button" title="Refresh models and status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
             <polyline points="23 4 23 10 17 10"/>
@@ -167,13 +199,18 @@
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
           </svg>
         </button>
-        <button class="icon-btn" id="applyBtn" type="button" title="Apply result" disabled>
-          <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-            <path fill-rule="evenodd" clip-rule="evenodd" d="M18.1716 1C18.702 1 19.2107 1.21071 19.5858 1.58579L22.4142 4.41421C22.7893 4.78929 23 5.29799 23 5.82843V20C23 21.6569 21.6569 23 20 23H4C2.34315 23 1 21.6569 1 20V4C1 2.34315 2.34315 1 4 1H18.1716ZM4 3C3.44772 3 3 3.44772 3 4V20C3 20.5523 3.44772 21 4 21L5 21L5 15C5 13.3431 6.34315 12 8 12L16 12C17.6569 12 19 13.3431 19 15V21H20C20.5523 21 21 20.5523 21 20V6.82843C21 6.29799 20.7893 5.78929 20.4142 5.41421L18.5858 3.58579C18.2107 3.21071 17.702 3 17.1716 3H17V5C17 6.65685 15.6569 8 14 8H10C8.34315 8 7 6.65685 7 5V3H4ZM17 21V15C17 14.4477 16.5523 14 16 14L8 14C7.44772 14 7 14.4477 7 15L7 21L17 21ZM9 3H15V5C15 5.55228 14.5523 6 14 6H10C9.44772 6 9 5.55228 9 5V3Z" fill="currentColor"/>
+        <button class="apply-btn" id="applyBtn" type="button" disabled>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
           </svg>
+          Apply to Layer
         </button>
       </div>
 
+      <div class="message-inline" id="errorMessage" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="panel-footer">
       <button class="generate-btn" id="generateBtn" type="button" disabled>
         <div class="btn-inner">
           <svg class="btn-icon" viewBox="0 0 16 16" fill="none">
@@ -183,8 +220,6 @@
           <span id="generateLabel">Generate</span>
         </div>
       </button>
-
-      <div class="message-inline" id="errorMessage" role="status" aria-live="polite"></div>
     </div>
 
     <div class="vram-row">
@@ -194,7 +229,11 @@
     </div>
 
     <div class="history-strip" id="historyStrip">
-      <button class="hist-add" id="saveHistoryBtn" type="button">+</button>
+      <button class="hist-add" id="saveHistoryBtn" type="button" title="Save current result to history">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M18.1716 1C18.702 1 19.2107 1.21071 19.5858 1.58579L22.4142 4.41421C22.7893 4.78929 23 5.29799 23 5.82843V20C23 21.6569 21.6569 23 20 23H4C2.34315 23 1 21.6569 1 20V4C1 2.34315 2.34315 1 4 1H18.1716ZM4 3C3.44772 3 3 3.44772 3 4V20C3 20.5523 3.44772 21 4 21L5 21L5 15C5 13.3431 6.34315 12 8 12L16 12C17.6569 12 19 13.3431 19 15V21H20C20.5523 21 21 20.5523 21 20V6.82843C21 6.29799 20.7893 5.78929 20.4142 5.41421L18.5858 3.58579C18.2107 3.21071 17.702 3 17.1716 3H17V5C17 6.65685 15.6569 8 14 8H10C8.34315 8 7 6.65685 7 5V3H4ZM17 21V15C17 14.4477 16.5523 14 16 14L8 14C7.44772 14 7 14.4477 7 15L7 21L17 21ZM9 3H15V5C15 5.55228 14.5523 6 14 6H10C9.44772 6 9 5.55228 9 5V3Z" fill="currentColor"/>
+        </svg>
+      </button>
     </div>
   </div>
 

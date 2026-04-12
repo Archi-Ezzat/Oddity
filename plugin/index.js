@@ -8,28 +8,25 @@ const DOWNLOAD_POLL_MS = 800;
 const MAX_HISTORY = 8;
 const STORAGE_KEYS = {
   history: "oddity.history.v3",
+  savedPrompts: "oddity.savedPrompts.v1",
+  activeStyle: "oddity.activeStyle.v1",
+  serverUrl: "oddity.serverUrl.v1",
 };
 
-const MODE_CONFIG = {
-  generate: { label: "Generate", usesCanvas: false, modeBadge: "TXT", canvasLabel: "Text-to-image generation" },
-  inpaint: { label: "Inpaint", usesCanvas: true, modeBadge: "MASK", canvasLabel: "Repair details inside the active selection" },
-  outpaint: { label: "Expand", usesCanvas: true, modeBadge: "EXP", canvasLabel: "Expand the Photoshop canvas before generating" },
-};
-
-const dom = {};
 const state = {
-  currentMode: "generate",
-  compareMode: "after",
   isGenerating: false,
   modelReady: false,
   serverConnected: false,
-  serverUrl: SERVER_URLS[0],
-  beforeImage: null,
-  lastGeneratedImage: null,
+  serverUrl: loadStored(STORAGE_KEYS.serverUrl, SERVER_URLS[0]),
+  isSettingsOpen: false,
+  batchSize: 1,
+  activeGridIndex: 0,
+  gridImages: [],
   history: loadStored(STORAGE_KEYS.history, []),
   healthInterval: null,
   progressInterval: null,
   downloadInterval: null,
+  selectionInterval: null,
   progressStartedAt: 0,
   progressLastStep: 0,
   historyFlashTimer: null,
@@ -37,7 +34,11 @@ const state = {
   currentView: "main", // "main" | "library"
   registry: null,
   readyModels: [],
+  hasSelection: false,
+  mode: "generate", // "generate" | "inpaint"
 };
+
+const dom = {};
 
 function $(id) {
   return document.getElementById(id);
@@ -47,22 +48,14 @@ function bindDom() {
   Object.assign(dom, {
     body: document.body,
     logoMark: $("logoMark"),
-    logoSub: $("logoSub"),
     statusPill: $("statusPill"),
     statusLabel: $("statusLabel"),
     canvasArea: $("canvasArea"),
     canvasLabel: $("canvasLabel"),
     canvasPlaceholder: $("canvasPlaceholder"),
-    beforeImage: $("beforeImage"),
-    previewImage: $("previewImage"),
+    previewGrid: $("previewGrid"),
     dimensionBadge: $("dimensionBadge"),
     modeBadge: $("modeBadge"),
-    beforeBtn: $("beforeBtn"),
-    afterBtn: $("afterBtn"),
-    tabGenerate: $("tabGenerate"),
-    tabInpaint: $("tabInpaint"),
-    tabExpand: $("tabExpand"),
-    tabHistory: $("tabHistory"),
     activePromptCard: $("activePromptCard"),
     activePromptText: $("activePromptText"),
     promptInput: $("promptInput"),
@@ -76,23 +69,7 @@ function bindDom() {
     etaValue: $("etaValue"),
     batchValue: $("batchValue"),
     cancelBtn: $("cancelBtn"),
-    strengthCard: $("strengthCard"),
-    strengthLabel: $("strengthLabel"),
-    settingStrength: $("settingStrength"),
-    strengthValue: $("strengthValue"),
-    strengthHint: $("strengthHint"),
-    settingGuidance: $("settingGuidance"),
-    guidanceValue: $("guidanceValue"),
-    settingSteps: $("settingSteps"),
-    stepsValue: $("stepsValue"),
-    resolutionCard: $("resolutionCard"),
-    detailLabel: $("detailLabel"),
-    settingResolution: $("settingResolution"),
-    resolutionValue: $("resolutionValue"),
-    detailHint: $("detailHint"),
-    settingSeed: $("settingSeed"),
-    seedDice: $("seedDice"),
-    layerRouting: $("layerRouting"),
+    variationRow: $("variationRow"),
     refreshBtn: $("refreshBtn"),
     applyBtn: $("applyBtn"),
     generateBtn: $("generateBtn"),
@@ -116,6 +93,19 @@ function bindDom() {
     downloadLabel: $("downloadLabel"),
     downloadFill: $("downloadFill"),
     downloadSub: $("downloadSub"),
+    // Phase 2: Style & Prompts
+    styleChips: $("styleChips"),
+    advancedToggle: $("advancedToggle"),
+    advancedArea: $("advancedArea"),
+    toggleArrow: $("toggleArrow"),
+    negativePromptInput: $("negativePromptInput"),
+    savePromptBtn: $("savePromptBtn"),
+    savedPrompts: $("savedPrompts"),
+    // Settings Settings
+    settingsToggleBtn: $("settingsToggleBtn"),
+    settingsPanel: $("settingsPanel"),
+    serverUrlInput: $("serverUrlInput"),
+    connectBtn: $("connectBtn"),
   });
 }
 
@@ -142,6 +132,7 @@ function showMessage(message, tone = "neutral", duration = 4200) {
   dom.errorMessage.className = "message-inline visible";
   if (tone === "error") dom.errorMessage.classList.add("is-error");
   if (tone === "success") dom.errorMessage.classList.add("is-success");
+  if (tone === "neutral") dom.errorMessage.classList.add("is-neutral");
   if (duration > 0) {
     state.messageTimer = setTimeout(() => {
       dom.errorMessage.className = "message-inline";
@@ -160,7 +151,6 @@ function setStatus(kind, label, subline) {
   dom.body.dataset.status = kind;
   dom.statusPill.className = `status-pill is-${kind}`;
   dom.statusLabel.textContent = label;
-  dom.logoSub.textContent = subline;
   dom.logoMark.classList.toggle("is-generating", kind === "generating");
 }
 
@@ -168,71 +158,18 @@ function getPromptValue() {
   return typeof dom.promptInput.value === "string" ? dom.promptInput.value : "";
 }
 
-function getEffectiveMode() {
-  return state.currentMode;
-}
-
-function updateCharCount() {
-  dom.charCount.textContent = getPromptValue().length;
-  updateGenerateAvailability();
-}
-
-function syncSliders() {
-  dom.strengthValue.textContent = `${dom.settingStrength.value}%`;
-  dom.guidanceValue.textContent = (Number(dom.settingGuidance.value) / 10).toFixed(1);
-  dom.stepsValue.textContent = dom.settingSteps.value;
-  dom.resolutionValue.textContent = dom.settingResolution.disabled ? "AUTO" : dom.settingResolution.value;
-}
-
-function updateCanvasState() {
-  dom.body.dataset.compare = state.compareMode;
-  dom.canvasArea.classList.toggle("has-before", Boolean(state.beforeImage));
-  dom.canvasArea.classList.toggle("has-after", Boolean(state.lastGeneratedImage));
-  dom.beforeBtn.classList.toggle("active", state.compareMode === "before");
-  dom.afterBtn.classList.toggle("active", state.compareMode === "after");
-  dom.beforeBtn.classList.toggle("is-disabled", !state.beforeImage);
-  if (!state.beforeImage && state.compareMode === "before") {
-    state.compareMode = "after";
-  }
-}
-
 function updateButtons() {
-  const mode = getEffectiveMode();
-  dom.generateLabel.textContent = MODE_CONFIG[mode].label;
+  // Preserve fill mode label
+  if (!state.isGenerating) {
+    dom.generateLabel.textContent = state.hasSelection ? "Generate Fill" : "Generate";
+  }
   dom.generateBtn.classList.toggle("generating", state.isGenerating);
-  dom.applyBtn.disabled = !state.lastGeneratedImage || state.isGenerating;
+  dom.applyBtn.disabled = !state.gridImages.length || state.isGenerating;
   dom.refreshBtn.disabled = state.isGenerating;
   dom.cancelBtn.classList.toggle("visible", state.isGenerating);
   dom.activePromptCard.classList.toggle("visible", state.isGenerating);
   dom.progressArea.classList.toggle("visible", state.isGenerating);
   dom.generationStats.classList.toggle("visible", state.isGenerating);
-}
-
-function updateTabState() {
-  dom.tabGenerate.classList.toggle("active", state.currentMode === "generate");
-  dom.tabInpaint.classList.toggle("active", state.currentMode === "inpaint");
-  dom.tabExpand.classList.toggle("active", state.currentMode === "outpaint");
-}
-
-function updateModeUI() {
-  const mode = getEffectiveMode();
-  const usesCanvas = MODE_CONFIG[mode].usesCanvas;
-  dom.body.dataset.mode = mode;
-  updateTabState();
-  dom.modeBadge.textContent = MODE_CONFIG[mode].modeBadge;
-  dom.canvasLabel.textContent = MODE_CONFIG[mode].canvasLabel;
-
-  dom.settingStrength.disabled = false;
-  dom.strengthCard.classList.remove("is-disabled");
-  dom.strengthHint.textContent = mode === "outpaint" ? "Blend" : "Denoising";
-
-  dom.settingResolution.disabled = usesCanvas;
-  dom.resolutionCard.classList.toggle("is-disabled", usesCanvas);
-  dom.detailLabel.textContent = usesCanvas ? "Canvas" : "Resolution";
-  dom.detailHint.textContent = usesCanvas ? "From Doc" : "Square";
-
-  syncSliders();
-  updateGenerateAvailability();
 }
 
 function updateGenerateAvailability() {
@@ -245,9 +182,20 @@ function updateDimensionBadge(width, height) {
   dom.dimensionBadge.textContent = `${width} × ${height}`;
 }
 
-function randomSeed() {
-  dom.settingSeed.value = String(Math.floor(Math.random() * 9999999));
+function updateCharCount() {
+  const len = getPromptValue().length;
+  dom.charCount.textContent = String(len);
 }
+
+function getModelResolution(model) {
+  // SD 1.5 models work best at 512×512
+  // SDXL, Flux, SD3 work best at 1024×1024
+  if (!model) return { width: 1024, height: 1024 };
+  if (model.family === "sd15") return { width: 512, height: 512 };
+  return { width: 1024, height: 1024 };
+}
+
+
 
 // ---------------------------------------------------------------------------
 // Model selector
@@ -269,14 +217,12 @@ function updateModelBadge() {
     dom.modelFamilyBadge.textContent = model.family_display || model.family.toUpperCase();
     dom.modelFamilyBadge.style.background = model.badge_color || "#7C8CFF";
     dom.modelSelectorSub.textContent = model.name;
-    // Apply model defaults to sliders
     if (model.default_steps) {
-      dom.settingSteps.value = String(model.default_steps);
+      // automated parameter
     }
     if (model.default_guidance !== undefined) {
-      dom.settingGuidance.value = String(Math.round(model.default_guidance * 10));
+      // automated parameter
     }
-    syncSliders();
   } else {
     dom.modelFamilyBadge.textContent = "—";
     dom.modelFamilyBadge.style.background = "rgba(255,255,255,0.08)";
@@ -308,10 +254,15 @@ function renderHistory() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "hist-thumb";
-    if (state.lastGeneratedImage && state.lastGeneratedImage.base64 === entry.image) {
-      button.classList.add("active");
-    }
-    button.title = entry.prompt || MODE_CONFIG[entry.mode]?.label || "Generation";
+    
+    // Check if this history entry is currently active
+    const isActive = state.gridImages && state.gridImages.length > 0 && 
+                     state.gridImages[state.activeGridIndex] &&
+                     state.gridImages[state.activeGridIndex].base64 === entry.image;
+                     
+    if (isActive) button.classList.add("active");
+    
+    button.title = entry.prompt || "Generation";
     button.innerHTML = `<div class="hist-thumb-inner"><img src="data:image/png;base64,${entry.image}" alt="History preview"></div>`;
     button.addEventListener("click", () => restoreHistory(entry));
     dom.historyStrip.appendChild(button);
@@ -323,63 +274,47 @@ function renderHistory() {
   plus.id = "saveHistoryBtn";
   plus.textContent = "+";
   plus.title = "History is recorded automatically";
-  plus.addEventListener("click", () => {
-    showMessage("History is recorded automatically after each successful render.");
-  });
+  plus.addEventListener("click", () => showMessage("History is recorded automatically."));
   dom.historyStrip.appendChild(plus);
-  dom.saveHistoryBtn = plus;
 }
 
 function restoreHistory(entry) {
-  state.currentMode = entry.tabMode || entry.mode;
   dom.promptInput.value = entry.prompt || "";
-  dom.settingStrength.value = String(entry.strength || 72);
-  dom.settingGuidance.value = String(entry.guidance || 75);
-  dom.settingSteps.value = String(entry.steps || 28);
-  dom.settingResolution.value = String(entry.resolution || 1024);
-  dom.settingSeed.value = String(entry.seed ?? -1);
-  dom.layerRouting.value = entry.route || "new_layer";
-  
-  // Restore model selection if available
+  state.batchSize = 1;
+  dom.variationRow.querySelectorAll(".var-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.val === "1");
+  });
+
   if (entry.modelValue) {
     const options = [...dom.settingModel.options];
     const match = options.find((o) => o.value === entry.modelValue);
     if (match) dom.settingModel.value = entry.modelValue;
   }
+
+  state.gridImages = [{ base64: entry.image, width: entry.width, height: entry.height, seed: entry.seed }];
+  state.activeGridIndex = 0;
   
-  state.beforeImage = entry.beforeImage || null;
-  state.lastGeneratedImage = { base64: entry.image, width: entry.width, height: entry.height };
-  dom.previewImage.src = `data:image/png;base64,${entry.image}`;
-  if (entry.beforeImage) {
-    dom.beforeImage.src = `data:image/png;base64,${entry.beforeImage}`;
-    state.compareMode = "before";
-  } else {
-    state.compareMode = "after";
-  }
+  renderGrid();
   updateDimensionBadge(entry.width || 1024, entry.height || 1024);
   updateModelBadge();
-  updateModeUI();
   updateCharCount();
-  updateCanvasState();
+  updateButtons();
+  
+  // Flash effect on canvas area to show something was restored
+  dom.canvasArea.style.opacity = "0.5";
+  setTimeout(() => dom.canvasArea.style.opacity = "1", 150);
+  
   showMessage("History item restored.", "success");
 }
 
-function pushHistory(result, seed, width, height) {
+function pushHistory(imageEntry) {
   const entry = {
     id: `history-${Date.now()}`,
-    image: result.image,
+    image: imageEntry.base64,
     prompt: getPromptValue().trim(),
-    mode: getEffectiveMode(),
-    tabMode: state.currentMode,
-    seed,
-    width,
-    height,
-    beforeImage: state.beforeImage,
-    strength: Number(dom.settingStrength.value),
-    guidance: Number(dom.settingGuidance.value),
-    steps: Number(dom.settingSteps.value),
-    resolution: Number(dom.settingResolution.value),
-    route: dom.layerRouting.value,
+    seed: imageEntry.seed,
+    width: imageEntry.width,
+    height: imageEntry.height,
     modelValue: dom.settingModel.value,
   };
   state.history = [entry, ...state.history].slice(0, MAX_HISTORY);
@@ -392,7 +327,8 @@ function pushHistory(result, seed, width, height) {
 // ---------------------------------------------------------------------------
 
 async function serverFetch(endpoint, options = {}) {
-  const candidates = [state.serverUrl, ...SERVER_URLS.filter((url) => url !== state.serverUrl)];
+  // If user has a custom URL, try it first. Otherwise fall back to defaults.
+  const candidates = [state.serverUrl, ...SERVER_URLS].filter((url, i, self) => self.indexOf(url) === i);
   let lastError = null;
 
   for (const baseUrl of candidates) {
@@ -410,14 +346,15 @@ async function serverFetch(endpoint, options = {}) {
         throw new Error(error.detail || `Server error: ${response.status}`);
       }
 
-      state.serverUrl = baseUrl;
+      // If we connected to a fallback successfully, stick with it? 
+      // Actually, if it's explicitly set by user, they probably want that one.
       return response.json();
     } catch (error) {
       lastError = error;
     }
   }
 
-  throw lastError || new Error("Unable to reach local server.");
+  throw lastError || new Error("Unable to reach server. Check your connection settings.");
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +600,50 @@ async function checkHealth() {
 }
 
 // ---------------------------------------------------------------------------
+// Selection detection
+// ---------------------------------------------------------------------------
+
+async function checkSelection() {
+  if (state.isGenerating) return; // Don't change mode mid-generation
+  try {
+    const doc = app.activeDocument;
+    if (!doc) {
+      if (state.hasSelection) {
+        state.hasSelection = false;
+        state.mode = "generate";
+        dom.modeBadge.textContent = "TXT";
+        dom.generateLabel.textContent = "Generate";
+        dom.canvasLabel.textContent = "No active selection";
+        document.body.classList.remove("fill-mode");
+      }
+      return;
+    }
+    const hasSel = doc.selection.bounds !== null;
+    if (hasSel !== state.hasSelection) {
+      state.hasSelection = hasSel;
+      state.mode = hasSel ? "inpaint" : "generate";
+      dom.modeBadge.textContent = hasSel ? "FILL" : "TXT";
+      dom.generateLabel.textContent = hasSel ? "Generate Fill" : "Generate";
+      dom.canvasLabel.textContent = hasSel ? "Selection active — ready to fill" : "No active selection";
+      document.body.classList.toggle("fill-mode", hasSel);
+      // Update resolution badge based on document size when selection changes
+      if (hasSel) {
+        updateDimensionBadge(doc.width, doc.height);
+      }
+    }
+  } catch (e) {
+    // Selection API may throw if no document is open or selection is invalid
+    if (state.hasSelection) {
+      state.hasSelection = false;
+      state.mode = "generate";
+      dom.modeBadge.textContent = "TXT";
+      dom.generateLabel.textContent = "Generate";
+      document.body.classList.remove("fill-mode");
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Canvas capture
 // ---------------------------------------------------------------------------
 
@@ -711,16 +692,32 @@ async function captureCanvas() {
 }
 
 async function captureMask() {
-  // Capture the current selection as a mask (white = selected, black = unselected)
+  // Capture the current Photoshop selection as a mask image
+  // White = selected area (where AI will generate), Black = keep as-is
   const doc = app.activeDocument;
   if (!doc) throw new Error("Open a Photoshop document first.");
 
   let base64Mask = null;
 
   await core.executeAsModal(async () => {
-    // Create a temporary channel from selection
+    const w = doc.width;
+    const h = doc.height;
+
+    // Step 1: Create a temporary document at the same size
+    const tempDoc = await app.documents.add({
+      width: w,
+      height: h,
+      resolution: doc.resolution,
+      mode: "RGBColorMode",
+      fill: "black",
+      name: "_oddity_mask_temp",
+    });
+
     try {
-      // Save selection to channel, capture it, then remove
+      // Step 2: Go back to original doc and save selection to clipboard
+      await app.activeDocument = doc;
+
+      // Save selection as alpha channel
       await action.batchPlay([
         {
           _obj: "set",
@@ -728,35 +725,85 @@ async function captureMask() {
           to: { _ref: "channel", _enum: "channel", _value: "transparencyEnum" },
         },
       ], { modalBehavior: "execute" });
-    } catch (e) {
-      // If no selection exists, create a full white mask
-    }
 
-    const tempFolder = await storage.localFileSystem.getTemporaryFolder();
-    const tempFile = await tempFolder.createFile("oddity_mask.png", { overwrite: true });
+      // Select All + Copy in the original to get the selection shape
+      // Instead, we use a different approach:
+      // Go to the temp doc, load selection from the original document, fill white
 
-    await action.batchPlay([
-      {
-        _obj: "save",
-        as: {
-          _obj: "PNGFormat",
-          PNGInterlaceType: { _enum: "PNGInterlaceType", _value: "PNGInterlaceNone" },
-          compression: 6,
+      // Switch to temp doc
+      await app.activeDocument = tempDoc;
+
+      // Fill entire document with black background first (already done by fill: "black")
+      // Now load the selection from the original doc
+      // We do this by: select all in temp, then load selection from original
+
+      // Load selection from original document
+      await action.batchPlay([
+        {
+          _obj: "set",
+          _target: [{ _ref: "channel", _property: "selection" }],
+          from: {
+            _ref: "channel",
+            _enum: "channel",
+            _value: "transparencyEnum",
+          },
+          _options: { dialogOptions: "dontDisplay" },
         },
-        in: { _path: tempFile.nativePath, _kind: "local" },
-        copy: true,
-        lowerCase: true,
-        embedProfiles: false,
-      },
-    ], { modalBehavior: "execute" });
+      ], { modalBehavior: "execute" });
 
-    const fileData = await tempFile.read({ format: storage.formats.binary });
-    const bytes = new Uint8Array(fileData);
-    let binary = "";
-    for (let index = 0; index < bytes.length; index += 1) {
-      binary += String.fromCharCode(bytes[index]);
+      // Fill the selection with white
+      await action.batchPlay([
+        {
+          _obj: "fill",
+          using: { _enum: "fillContents", _value: "white" },
+          opacity: { _unit: "percentUnit", _value: 100 },
+          mode: { _enum: "blendMode", _value: "normal" },
+          _options: { dialogOptions: "dontDisplay" },
+        },
+      ], { modalBehavior: "execute" });
+
+      // Deselect
+      await action.batchPlay([
+        {
+          _obj: "set",
+          _target: [{ _ref: "channel", _property: "selection" }],
+          to: { _enum: "ordinal", _value: "none" },
+          _options: { dialogOptions: "dontDisplay" },
+        },
+      ], { modalBehavior: "execute" });
+
+      // Save temp doc as PNG
+      const tempFolder = await storage.localFileSystem.getTemporaryFolder();
+      const tempFile = await tempFolder.createFile("oddity_mask.png", { overwrite: true });
+
+      await action.batchPlay([
+        {
+          _obj: "save",
+          as: {
+            _obj: "PNGFormat",
+            PNGInterlaceType: { _enum: "PNGInterlaceType", _value: "PNGInterlaceNone" },
+            compression: 6,
+          },
+          in: { _path: tempFile.nativePath, _kind: "local" },
+          copy: true,
+          lowerCase: true,
+          embedProfiles: false,
+        },
+      ], { modalBehavior: "execute" });
+
+      const fileData = await tempFile.read({ format: storage.formats.binary });
+      const bytes = new Uint8Array(fileData);
+      let binary = "";
+      for (let index = 0; index < bytes.length; index += 1) {
+        binary += String.fromCharCode(bytes[index]);
+      }
+      base64Mask = btoa(binary);
+    } finally {
+      // Close temp document without saving
+      await tempDoc.closeWithoutSaving();
+      // Switch back to original
+      await app.activeDocument = doc;
     }
-    base64Mask = btoa(binary);
   }, { commandName: "Oddity: Capture Mask" });
 
   return base64Mask;
@@ -831,7 +878,7 @@ function updateProgress(step, total) {
   const pct = total > 0 ? Math.round((step / total) * 100) : 0;
   dom.progressPct.textContent = `${pct}%`;
   dom.progressFill.style.width = `${pct}%`;
-  dom.batchValue.textContent = "1/1";
+  dom.batchValue.textContent = `${state.batchSize}`;
 
   const elapsed = Math.max(0.001, (Date.now() - state.progressStartedAt) / 1000);
   const speed = step > 0 ? step / elapsed : 0;
@@ -870,161 +917,159 @@ function stopProgressPolling() {
 // Generation
 // ---------------------------------------------------------------------------
 
+function renderGrid() {
+  dom.previewGrid.innerHTML = "";
+  dom.previewGrid.className = `preview-grid grid-${state.gridImages.length}`;
+  
+  if (state.gridImages.length === 0) {
+    dom.canvasArea.classList.remove("has-after");
+    dom.previewGrid.innerHTML = "";
+    return;
+  }
+  
+  dom.canvasArea.classList.add("has-after");
+  
+  state.gridImages.forEach((img, index) => {
+    const item = document.createElement("div");
+    item.className = `grid-item ${index === state.activeGridIndex ? "selected" : ""}`;
+    item.innerHTML = `<img src="data:image/png;base64,${img.base64}" alt="Variation ${index + 1}">`;
+    item.addEventListener("click", () => {
+      state.activeGridIndex = index;
+      renderGrid();
+      renderHistory(); 
+    });
+    dom.previewGrid.appendChild(item);
+  });
+}
+
 async function runGeneration() {
   if (state.isGenerating) return;
-  const prompt = getPromptValue().trim();
-  if (!prompt) {
+  const rawPrompt = getPromptValue().trim();
+  if (!rawPrompt) {
     showMessage("Enter a prompt before generating.", "error");
     return;
   }
+  // Apply style prefix if a style is selected
+  const prompt = getStyledPrompt(rawPrompt);
   const model = getSelectedModel();
   if (!model) {
     showMessage("No model selected. Open the Model Library to download one.", "error");
     return;
   }
 
+  // Check if we should do inpainting (selection exists)
+  const isInpaint = state.hasSelection;
+
   clearMessage();
   state.isGenerating = true;
-  state.lastGeneratedImage = null;
-  dom.previewImage.removeAttribute("src");
+  state.gridImages = [];
+  state.activeGridIndex = 0;
+  renderGrid();
+  
   dom.applyBtn.disabled = true;
-  const mode = getEffectiveMode();
-  const usesCanvas = MODE_CONFIG[mode].usesCanvas;
   const familyLabel = model.family_display || model.family.toUpperCase();
-  setStatus("generating", familyLabel, `Preparing ${MODE_CONFIG[mode].label.toLowerCase()} request`);
+  const modeLabel = isInpaint ? "Filling selection" : `Preparing ${state.batchSize} variations`;
+  setStatus("generating", familyLabel, modeLabel);
   dom.activePromptText.textContent = prompt;
   updateButtons();
-  updateModeUI();
-  updateCanvasState();
 
   try {
-    let sourceBase64 = null;
-    let maskBase64 = null;
-    let width = Number(dom.settingResolution.value);
-    let height = Number(dom.settingResolution.value);
-
-    if (usesCanvas) {
-      sourceBase64 = await captureCanvas();
-      state.beforeImage = sourceBase64;
-      dom.beforeImage.src = `data:image/png;base64,${sourceBase64}`;
-      dom.progressSub.textContent = "Capturing the active Photoshop document.";
-
-      if (mode === "inpaint") {
-        try {
-          maskBase64 = await captureMask();
-        } catch (e) {
-          console.warn("Could not capture mask, using full image:", e);
-        }
-      }
-    } else {
-      state.beforeImage = null;
-      dom.beforeImage.removeAttribute("src");
-    }
-
-    updateCanvasState();
     startProgressPolling();
+    const res = getModelResolution(model);
+    let result;
 
-    let endpoint;
-    let body;
+    if (isInpaint) {
+      // --- INPAINT / FILL MODE ---
+      showMessage("Capturing canvas and selection mask...", "neutral", 0);
+      const canvasImage = await captureCanvas();
+      const maskImage = await captureMask();
+      clearMessage();
 
-    if (mode === "inpaint" && maskBase64) {
-      endpoint = "/inpaint";
-      body = {
+      const negPrompt = dom.negativePromptInput ? dom.negativePromptInput.value.trim() : "";
+
+      const body = {
         family: model.family,
         model_id: model.id,
         prompt,
-        image: sourceBase64,
-        mask: maskBase64,
-        strength: Number(dom.settingStrength.value) / 100,
-        num_steps: Number(dom.settingSteps.value),
-        guidance_scale: Number(dom.settingGuidance.value) / 10,
-        seed: parseInt(dom.settingSeed.value, 10) || -1,
+        negative_prompt: negPrompt,
+        image: canvasImage,
+        mask: maskImage,
+        strength: 0.85,
+        num_steps: model.default_steps || 20,
+        guidance_scale: model.default_guidance || 7.5,
+        seed: -1,
+        batch_size: state.batchSize,
       };
-    } else if (usesCanvas) {
-      endpoint = "/img2img";
-      body = {
-        family: model.family,
-        model_id: model.id,
-        prompt,
-        image: sourceBase64,
-        strength: Number(dom.settingStrength.value) / 100,
-        num_steps: Number(dom.settingSteps.value),
-        guidance_scale: Number(dom.settingGuidance.value) / 10,
-        seed: parseInt(dom.settingSeed.value, 10) || -1,
-      };
+
+      result = await serverFetch("/inpaint", { method: "POST", body: JSON.stringify(body) });
     } else {
-      endpoint = "/generate";
-      body = {
+      // --- TEXT-TO-IMAGE MODE ---
+      const negPrompt = dom.negativePromptInput ? dom.negativePromptInput.value.trim() : "";
+
+      const body = {
         family: model.family,
         model_id: model.id,
         prompt,
-        width,
-        height,
-        num_steps: Number(dom.settingSteps.value),
-        guidance_scale: Number(dom.settingGuidance.value) / 10,
-        seed: parseInt(dom.settingSeed.value, 10) || -1,
+        negative_prompt: negPrompt,
+        width: res.width,
+        height: res.height,
+        num_steps: model.default_steps || 20,
+        guidance_scale: model.default_guidance || 7.5,
+        seed: -1,
+        batch_size: state.batchSize,
       };
+
+      result = await serverFetch("/generate", { method: "POST", body: JSON.stringify(body) });
     }
 
-    const result = await serverFetch(endpoint, { method: "POST", body: JSON.stringify(body) });
-
-    state.lastGeneratedImage = { base64: result.image, width: result.width, height: result.height };
-    dom.previewImage.src = `data:image/png;base64,${result.image}`;
-    state.compareMode = "after";
+    state.gridImages = result.images.map((base64, i) => ({
+      base64,
+      width: result.width,
+      height: result.height,
+      seed: result.seeds[i]
+    }));
+    state.activeGridIndex = 0;
+    
+    renderGrid();
     updateDimensionBadge(result.width, result.height);
-    updateCanvasState();
-    pushHistory(result, result.seed, result.width, result.height);
-    setStatus("ready", familyLabel, `Render ready · seed ${result.seed}`);
+    
+    // push history for each result
+    state.gridImages.forEach(img => pushHistory(img));
+    
+    setStatus("ready", familyLabel, isInpaint ? "Fill complete" : "Render ready");
     dom.applyBtn.disabled = false;
-    showMessage("Generation complete.", "success");
+    showMessage(isInpaint ? "Fill complete — click Apply to place on new layer." : "Generation complete.", "success");
   } catch (error) {
     const message = humanizeError(error.message);
-    setStatus("error", "ERROR", message);
-    showMessage(message, "error", 5200);
+    if (message.includes("cancelled")) {
+      setStatus("ready", familyLabel, "Generation cancelled");
+      showMessage("Generation cancelled.", "neutral");
+    } else {
+      setStatus("error", "ERROR", message);
+      showMessage(message, "error", 5200);
+    }
   } finally {
     stopProgressPolling();
     state.isGenerating = false;
     updateButtons();
-    updateModeUI();
     updateGenerateAvailability();
     await checkHealth();
   }
 }
 
 async function applyResult() {
-  if (!state.lastGeneratedImage) return;
+  const activeImage = state.gridImages[state.activeGridIndex];
+  if (!activeImage) return;
+  
   dom.applyBtn.disabled = true;
   try {
-    if (dom.layerRouting.value === "replace_canvas") {
-      await replaceCanvas(state.lastGeneratedImage.base64);
-      showMessage("Result replaced the active layer.", "success");
-    } else if (dom.layerRouting.value === "new_mask") {
-      await applyAsNewLayer(state.lastGeneratedImage.base64, "Oddity Mask Review");
-      showMessage("Result added as a mask review layer.", "success");
-    } else {
-      await applyAsNewLayer(state.lastGeneratedImage.base64, "Oddity Result");
-      showMessage("Result added as a new layer.", "success");
-    }
+    await applyAsNewLayer(activeImage.base64, "Oddity Result");
+    showMessage("Result applied as a new layer.", "success");
   } catch (error) {
     showMessage(`Apply failed: ${error.message}`, "error", 5200);
   } finally {
     dom.applyBtn.disabled = false;
   }
-}
-
-function setCurrentMode(mode) {
-  state.currentMode = mode;
-  updateModeUI();
-}
-
-function flashHistoryTab() {
-  clearTimeout(state.historyFlashTimer);
-  dom.tabHistory.classList.add("active");
-  state.historyFlashTimer = setTimeout(() => {
-    updateTabState();
-  }, 1200);
-  dom.historyStrip.scrollIntoView({ block: "nearest", inline: "nearest" });
-  showMessage(state.history.length ? "Tap a thumbnail below to restore a render." : "No history yet. Renders appear here after generation.");
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,30 +1085,18 @@ function initEvents() {
     }
   });
 
-  dom.tabGenerate.addEventListener("click", () => setCurrentMode("generate"));
-  dom.tabInpaint.addEventListener("click", () => setCurrentMode("inpaint"));
-  dom.tabExpand.addEventListener("click", () => setCurrentMode("outpaint"));
-  dom.tabHistory.addEventListener("click", flashHistoryTab);
-
-  dom.beforeBtn.addEventListener("click", () => {
-    if (!state.beforeImage) return;
-    state.compareMode = "before";
-    updateCanvasState();
-  });
-  dom.afterBtn.addEventListener("click", () => {
-    state.compareMode = "after";
-    updateCanvasState();
+  dom.variationRow.querySelectorAll(".var-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      dom.variationRow.querySelectorAll(".var-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.batchSize = parseInt(btn.dataset.val, 10) || 1;
+    });
   });
 
-  dom.settingStrength.addEventListener("input", syncSliders);
-  dom.settingGuidance.addEventListener("input", syncSliders);
-  dom.settingSteps.addEventListener("input", syncSliders);
-  dom.settingResolution.addEventListener("input", () => {
-    syncSliders();
-    updateDimensionBadge(dom.settingResolution.value, dom.settingResolution.value);
+  dom.settingModel.addEventListener("change", () => {
+    updateModelBadge();
+    updateNegativePromptForModel();
   });
-  dom.seedDice.addEventListener("click", randomSeed);
-  dom.settingModel.addEventListener("change", updateModelBadge);
   
   dom.refreshBtn.addEventListener("click", async () => {
     await checkHealth();
@@ -1072,13 +1105,215 @@ function initEvents() {
   });
   dom.generateBtn.addEventListener("click", runGeneration);
   dom.applyBtn.addEventListener("click", applyResult);
-  dom.cancelBtn.addEventListener("click", () => {
-    showMessage("Cancel is not available in the current backend yet.", "error", 4200);
+  dom.cancelBtn.addEventListener("click", async () => {
+    if (!state.isGenerating) return;
+    try {
+      await serverFetch("/cancel", { method: "POST" });
+      showMessage("Cancelling generation...", "neutral");
+    } catch (e) {
+      showMessage("Could not cancel — generation may have already finished.", "error", 3000);
+    }
+  });
+
+  // Escape key to cancel
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.isGenerating) {
+      dom.cancelBtn.click();
+    }
   });
 
   // View switching
   dom.viewLibraryBtn.addEventListener("click", () => switchView("library"));
   dom.libraryBackBtn.addEventListener("click", () => switchView("main"));
+
+  // Advanced toggle (negative prompt)
+  if (dom.advancedToggle) {
+    dom.advancedToggle.addEventListener("click", () => {
+      dom.advancedToggle.classList.toggle("open");
+      dom.advancedArea.classList.toggle("visible");
+    });
+  }
+
+  // Save prompt button
+  if (dom.savePromptBtn) {
+    dom.savePromptBtn.addEventListener("click", () => {
+      const text = getPromptValue().trim();
+      if (!text) {
+        showMessage("Type a prompt to save it.", "error", 2000);
+        return;
+      }
+      const saved = loadSavedPrompts();
+      if (saved.includes(text)) {
+        showMessage("This prompt is already saved.", "neutral", 2000);
+        return;
+      }
+      saved.unshift(text);
+      if (saved.length > 20) saved.pop();
+      saveSavedPrompts(saved);
+      renderSavedPrompts();
+      showMessage("Prompt saved!", "success", 1500);
+    });
+  }
+
+  // Settings panel toggle
+  if (dom.settingsToggleBtn) {
+    dom.settingsToggleBtn.addEventListener("click", () => {
+      state.isSettingsOpen = !state.isSettingsOpen;
+      dom.settingsPanel.classList.toggle("visible", state.isSettingsOpen);
+      dom.settingsToggleBtn.classList.toggle("active", state.isSettingsOpen);
+    });
+  }
+
+  // Connect button — save URL and reconnect
+  if (dom.connectBtn) {
+    dom.connectBtn.addEventListener("click", () => {
+      let url = dom.serverUrlInput.value.trim();
+      if (!url) {
+        url = SERVER_URLS[0]; // Reset to default
+        dom.serverUrlInput.value = url;
+      }
+      // Strip trailing slash
+      url = url.replace(/\/+$/, "");
+      state.serverUrl = url;
+      saveStored(STORAGE_KEYS.serverUrl, url);
+      dom.serverUrlInput.value = url;
+      showMessage(`Connecting to ${url}...`, "neutral", 2000);
+      // Immediately try to connect
+      checkHealth().then(() => {
+        if (state.serverConnected) {
+          showMessage(`Connected to ${url}`, "success", 3000);
+          loadModels();
+        } else {
+          showMessage(`Could not reach ${url}`, "error", 4000);
+        }
+      });
+    });
+  }
+
+  // Also allow Enter key in the URL input
+  if (dom.serverUrlInput) {
+    dom.serverUrlInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        dom.connectBtn.click();
+      }
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Prompt Library, Styles & Saved Prompts
+// ---------------------------------------------------------------------------
+
+let promptLibrary = null;
+let activeStyleIndex = -1;
+
+async function loadPromptLibrary() {
+  try {
+    const resp = await fetch("./prompt_library.json");
+    promptLibrary = await resp.json();
+    renderStyleChips();
+    // Restore last active style
+    const savedStyle = loadStored(STORAGE_KEYS.activeStyle, -1);
+    if (savedStyle >= 0 && promptLibrary.styles[savedStyle]) {
+      setActiveStyle(savedStyle);
+    }
+  } catch (e) {
+    console.warn("Could not load prompt library", e);
+  }
+}
+
+function renderStyleChips() {
+  if (!promptLibrary || !dom.styleChips) return;
+  dom.styleChips.innerHTML = "";
+  
+  // Add "None" chip
+  const noneChip = document.createElement("button");
+  noneChip.className = `style-chip${activeStyleIndex === -1 ? " active" : ""}`;
+  noneChip.type = "button";
+  noneChip.textContent = "None";
+  noneChip.addEventListener("click", () => setActiveStyle(-1));
+  dom.styleChips.appendChild(noneChip);
+
+  promptLibrary.styles.forEach((style, i) => {
+    const chip = document.createElement("button");
+    chip.className = `style-chip${i === activeStyleIndex ? " active" : ""}`;
+    chip.type = "button";
+    chip.innerHTML = `<img src="${style.icon}" class="style-icon" aria-hidden="true" /> ${style.name}`;
+    chip.addEventListener("click", () => setActiveStyle(i));
+    dom.styleChips.appendChild(chip);
+  });
+}
+
+function setActiveStyle(index) {
+  activeStyleIndex = index;
+  saveStored(STORAGE_KEYS.activeStyle, index);
+  renderStyleChips();
+}
+
+function getStyledPrompt(rawPrompt) {
+  if (activeStyleIndex < 0 || !promptLibrary) return rawPrompt;
+  const style = promptLibrary.styles[activeStyleIndex];
+  if (!style) return rawPrompt;
+  return style.prefix + rawPrompt;
+}
+
+function updateNegativePromptForModel() {
+  if (!promptLibrary || !dom.negativePromptInput) return;
+  const model = getSelectedModel();
+  if (!model) return;
+  const family = model.family || "sd15";
+  const defaultNeg = promptLibrary.negative_defaults[family] || "";
+  // Only auto-fill if the user hasn't typed anything custom
+  if (!dom.negativePromptInput.value.trim()) {
+    dom.negativePromptInput.value = defaultNeg;
+  }
+}
+
+// Saved prompts
+function loadSavedPrompts() {
+  return loadStored(STORAGE_KEYS.savedPrompts, []);
+}
+
+function saveSavedPrompts(prompts) {
+  saveStored(STORAGE_KEYS.savedPrompts, prompts);
+}
+
+function renderSavedPrompts() {
+  if (!dom.savedPrompts) return;
+  const prompts = loadSavedPrompts();
+  if (prompts.length === 0) {
+    dom.savedPrompts.innerHTML = '<div class="saved-prompts-empty">No saved prompts yet</div>';
+    return;
+  }
+  dom.savedPrompts.innerHTML = "";
+  prompts.forEach((text, i) => {
+    const item = document.createElement("div");
+    item.className = "saved-prompt-item";
+    item.innerHTML = `
+      <div class="saved-prompt-text">${escapeHtml(text)}</div>
+      <button class="saved-prompt-del" type="button" title="Delete">
+        <svg viewBox="-3 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <path d="M282,211 L262,211 C261.448,211 261,210.553 261,210 C261,209.448 261.448,209 262,209 L282,209 C282.552,209 283,209.448 283,210 C283,210.553 282.552,211 282,211 L282,211 Z M281,231 C281,232.104 280.104,233 279,233 L265,233 C263.896,233 263,232.104 263,231 L263,213 L281,213 L281,231 L281,231 Z M269,206 C269,205.447 269.448,205 270,205 L274,205 C274.552,205 275,205.447 275,206 L275,207 L269,207 L269,206 L269,206 Z M283,207 L277,207 L277,205 C277,203.896 276.104,203 275,203 L269,203 C267.896,203 267,203.896 267,205 L267,207 L261,207 C259.896,207 259,207.896 259,209 L259,211 C259,212.104 259.896,213 261,213 L261,231 C261,233.209 262.791,235 265,235 L279,235 C281.209,235 283,233.209 283,231 L283,213 C284.104,213 285,212.104 285,211 L285,209 C285,207.896 284.104,207 283,207 L283,207 Z M272,231 C272.552,231 273,230.553 273,230 L273,218 C273,217.448 272.552,217 272,217 C271.448,217 271,217.448 271,218 L271,230 C271,230.553 271.448,231 272,231 L272,231 Z M267,231 C267.552,231 268,230.553 268,230 L268,218 C268,217.448 267.552,217 267,217 C266.448,217 266,217.448 266,218 L266,230 C266,230.553 266.448,231 267,231 L267,231 Z M277,231 C277.552,231 278,230.553 278,230 L278,218 C278,217.448 277.552,217 277,217 C276.448,217 276,217.448 276,218 L276,230 C276,230.553 276.448,231 277,231 L277,231 Z" fill="currentColor" transform="translate(-259.000000, -203.000000)"/>
+        </svg>
+      </button>
+    `;
+    item.querySelector(".saved-prompt-text").addEventListener("click", () => {
+      dom.promptInput.value = text;
+      updateCharCount();
+    });
+    item.querySelector(".saved-prompt-del").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const updated = loadSavedPrompts().filter((_, idx) => idx !== i);
+      saveSavedPrompts(updated);
+      renderSavedPrompts();
+    });
+    dom.savedPrompts.appendChild(item);
+  });
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // ---------------------------------------------------------------------------
@@ -1089,16 +1324,21 @@ function init() {
   bindDom();
   renderHistory();
   initEvents();
-  syncSliders();
-  updateDimensionBadge(dom.settingResolution.value, dom.settingResolution.value);
-  updateModeUI();
-  updateCanvasState();
+  renderGrid();
   updateButtons();
   updateCharCount();
+  // Pre-fill server URL input from saved state
+  if (dom.serverUrlInput) {
+    dom.serverUrlInput.value = state.serverUrl;
+  }
   checkHealth();
   loadModels();
+  loadPromptLibrary();
+  renderSavedPrompts();
   state.healthInterval = setInterval(checkHealth, HEALTH_POLL_MS);
-  setInterval(loadModels, 12000);
+  // Poll for Photoshop selection changes
+  state.selectionInterval = setInterval(checkSelection, 2000);
+  checkSelection();
 }
 
 if (document.readyState === "loading") {

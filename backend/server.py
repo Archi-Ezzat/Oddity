@@ -60,6 +60,7 @@ loaded_components: Dict[str, Any] = {}  # component_id -> loaded object
 
 current_progress = {"step": 0, "total": 0, "preview": None, "status": "idle"}
 download_progress = {"active": False, "item": "", "bytes_downloaded": 0, "bytes_total": 0, "percent": 0, "status": "idle"}
+cancel_requested = False
 
 progress_lock = threading.Lock()
 pipeline_lock = threading.Lock()
@@ -571,6 +572,10 @@ def _build_sd15_pipeline(family_id: str, model_info: dict, cp_path: Path, regist
 def make_progress_callback(total_steps: int):
     """Create a callback for tracking diffusion progress."""
     def callback(pipe, step, timestep, callback_kwargs):
+        global cancel_requested
+        if cancel_requested:
+            cancel_requested = False
+            raise RuntimeError("Generation cancelled by user")
         with progress_lock:
             current_progress["step"] = step + 1
             current_progress["total"] = total_steps
@@ -593,6 +598,7 @@ class GenerateRequest(BaseModel):
     num_steps: int = Field(default=20, ge=1, le=100)
     guidance_scale: float = Field(default=7.5, ge=0.0, le=30.0)
     seed: int = Field(default=-1)
+    batch_size: int = Field(default=1, ge=1, le=4)
 
 
 class Img2ImgRequest(BaseModel):
@@ -605,6 +611,7 @@ class Img2ImgRequest(BaseModel):
     num_steps: int = Field(default=20, ge=1, le=100)
     guidance_scale: float = Field(default=7.5, ge=0.0, le=30.0)
     seed: int = Field(default=-1)
+    batch_size: int = Field(default=1, ge=1, le=4)
 
 
 class InpaintRequest(BaseModel):
@@ -618,6 +625,7 @@ class InpaintRequest(BaseModel):
     num_steps: int = Field(default=28, ge=1, le=100)
     guidance_scale: float = Field(default=7.5, ge=0.0, le=30.0)
     seed: int = Field(default=-1)
+    batch_size: int = Field(default=1, ge=1, le=4)
 
 
 class DownloadRequest(BaseModel):
@@ -884,30 +892,40 @@ async def generate(req: GenerateRequest):
 
     width = round_to_multiple(req.width)
     height = round_to_multiple(req.height)
-    seed = req.seed if req.seed >= 0 else int(time.time()) % (2**32)
-    generator = torch.Generator("cpu").manual_seed(seed)
+    import random as _random
+    base_seed = req.seed if req.seed >= 0 else _random.randint(0, 2**32 - 1)
+
+    # Generate a list of seeds for batch diversity
+    batch_seeds = [base_seed + i for i in range(req.batch_size)]
+    generator = torch.Generator("cpu").manual_seed(base_seed)
 
     log.info(f"Generating: '{req.prompt[:80]}...' @ {width}x{height}, "
-             f"steps={req.num_steps}, cfg={req.guidance_scale}, seed={seed}")
+             f"steps={req.num_steps}, cfg={req.guidance_scale}, seed={base_seed}, batch={req.batch_size}")
 
     with progress_lock:
         current_progress.update({"step": 0, "total": req.num_steps, "status": "generating"})
 
     try:
-        result = await asyncio.to_thread(
-            _run_generate, req.prompt, req.negative_prompt,
-            width, height, req.num_steps, req.guidance_scale, generator,
-        )
-        b64 = image_to_base64(result)
+        # For true batch diversity, generate each image with its own seed
+        all_images = []
+        for i, s in enumerate(batch_seeds):
+            gen = torch.Generator("cpu").manual_seed(s)
+            imgs = await asyncio.to_thread(
+                _run_generate, req.prompt, req.negative_prompt,
+                width, height, req.num_steps, req.guidance_scale, gen, 1
+            )
+            all_images.extend(imgs)
+
+        b64_images = [image_to_base64(img) for img in all_images]
 
         with progress_lock:
             current_progress.update({"step": 0, "total": 0, "status": "idle"})
 
         return {
-            "image": b64,
-            "width": result.width,
-            "height": result.height,
-            "seed": seed,
+            "images": b64_images,
+            "width": all_images[0].width,
+            "height": all_images[0].height,
+            "seeds": batch_seeds,
             "format": "png",
         }
 
@@ -918,7 +936,7 @@ async def generate(req: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _run_generate(prompt, negative_prompt, width, height, steps, guidance, generator):
+def _run_generate(prompt, negative_prompt, width, height, steps, guidance, generator, batch_size):
     """Synchronous text-to-image generation."""
     kwargs = {
         "prompt": prompt,
@@ -927,6 +945,7 @@ def _run_generate(prompt, negative_prompt, width, height, steps, guidance, gener
         "num_inference_steps": steps,
         "guidance_scale": guidance,
         "generator": generator,
+        "num_images_per_prompt": batch_size,
         "callback_on_step_end": make_progress_callback(steps),
     }
     # SDXL, SD3, and SD 1.5 support negative_prompt; Flux does not
@@ -934,7 +953,7 @@ def _run_generate(prompt, negative_prompt, width, height, steps, guidance, gener
         kwargs["negative_prompt"] = negative_prompt
 
     output = pipeline(**kwargs)
-    return output.images[0]
+    return output.images
 
 
 @app.post("/img2img")
@@ -958,7 +977,8 @@ async def img2img(req: Img2ImgRequest):
     if w != input_image.width or h != input_image.height:
         input_image = input_image.resize((w, h), Image.LANCZOS)
 
-    seed = req.seed if req.seed >= 0 else int(time.time()) % (2**32)
+    import random as _random
+    seed = req.seed if req.seed >= 0 else _random.randint(0, 2**32 - 1)
     generator = torch.Generator("cpu").manual_seed(seed)
 
     log.info(f"Img2Img: '{req.prompt[:80]}...' @ {w}x{h}, "
@@ -968,20 +988,20 @@ async def img2img(req: Img2ImgRequest):
         current_progress.update({"step": 0, "total": req.num_steps, "status": "generating"})
 
     try:
-        result = await asyncio.to_thread(
+        result_images = await asyncio.to_thread(
             _run_img2img, req.prompt, req.negative_prompt, input_image,
-            req.strength, req.num_steps, req.guidance_scale, generator,
+            req.strength, req.num_steps, req.guidance_scale, generator, req.batch_size
         )
-        b64 = image_to_base64(result)
+        b64_images = [image_to_base64(img) for img in result_images]
 
         with progress_lock:
             current_progress.update({"step": 0, "total": 0, "status": "idle"})
 
         return {
-            "image": b64,
-            "width": result.width,
-            "height": result.height,
-            "seed": seed,
+            "images": b64_images,
+            "width": result_images[0].width,
+            "height": result_images[0].height,
+            "seeds": [seed] * len(b64_images),
             "format": "png",
         }
 
@@ -992,7 +1012,7 @@ async def img2img(req: Img2ImgRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _run_img2img(prompt, negative_prompt, image, strength, steps, guidance, generator):
+def _run_img2img(prompt, negative_prompt, image, strength, steps, guidance, generator, batch_size):
     """Synchronous img2img generation."""
     kwargs = {
         "prompt": prompt,
@@ -1001,13 +1021,14 @@ def _run_img2img(prompt, negative_prompt, image, strength, steps, guidance, gene
         "num_inference_steps": steps,
         "guidance_scale": guidance,
         "generator": generator,
+        "num_images_per_prompt": batch_size,
         "callback_on_step_end": make_progress_callback(steps),
     }
     if pipeline_type in ("sdxl", "sdxl_inpaint", "sd3", "sd15", "sd15_inpaint") and negative_prompt:
         kwargs["negative_prompt"] = negative_prompt
 
     output = pipeline(**kwargs)
-    return output.images[0]
+    return output.images
 
 
 @app.post("/inpaint")
@@ -1037,7 +1058,8 @@ async def inpaint(req: InpaintRequest):
         input_image = input_image.resize((w, h), Image.LANCZOS)
         mask_image = mask_image.resize((w, h), Image.LANCZOS)
 
-    seed = req.seed if req.seed >= 0 else int(time.time()) % (2**32)
+    import random as _random
+    seed = req.seed if req.seed >= 0 else _random.randint(0, 2**32 - 1)
     generator = torch.Generator("cpu").manual_seed(seed)
 
     log.info(f"Inpaint: '{req.prompt[:80]}...' @ {w}x{h}, "
@@ -1047,20 +1069,20 @@ async def inpaint(req: InpaintRequest):
         current_progress.update({"step": 0, "total": req.num_steps, "status": "generating"})
 
     try:
-        result = await asyncio.to_thread(
+        result_images = await asyncio.to_thread(
             _run_inpaint, req.prompt, req.negative_prompt, input_image,
-            mask_image, req.strength, req.num_steps, req.guidance_scale, generator,
+            mask_image, req.strength, req.num_steps, req.guidance_scale, generator, req.batch_size
         )
-        b64 = image_to_base64(result)
+        b64_images = [image_to_base64(img) for img in result_images]
 
         with progress_lock:
             current_progress.update({"step": 0, "total": 0, "status": "idle"})
 
         return {
-            "image": b64,
-            "width": result.width,
-            "height": result.height,
-            "seed": seed,
+            "images": b64_images,
+            "width": result_images[0].width,
+            "height": result_images[0].height,
+            "seeds": [seed] * len(b64_images),
             "format": "png",
         }
 
@@ -1071,7 +1093,7 @@ async def inpaint(req: InpaintRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _run_inpaint(prompt, negative_prompt, image, mask, strength, steps, guidance, generator):
+def _run_inpaint(prompt, negative_prompt, image, mask, strength, steps, guidance, generator, batch_size):
     """Synchronous inpainting generation."""
     kwargs = {
         "prompt": prompt,
@@ -1081,13 +1103,14 @@ def _run_inpaint(prompt, negative_prompt, image, mask, strength, steps, guidance
         "num_inference_steps": steps,
         "guidance_scale": guidance,
         "generator": generator,
+        "num_images_per_prompt": batch_size,
         "callback_on_step_end": make_progress_callback(steps),
     }
     if pipeline_type in ("sdxl_inpaint", "sd15_inpaint") and negative_prompt:
         kwargs["negative_prompt"] = negative_prompt
 
     output = pipeline(**kwargs)
-    return output.images[0]
+    return output.images
 
 
 @app.post("/unload")
@@ -1096,6 +1119,15 @@ async def unload():
     with pipeline_lock:
         unload_pipeline()
     return {"status": "unloaded"}
+
+
+@app.post("/cancel")
+async def cancel_generation():
+    """Request cancellation of the current generation."""
+    global cancel_requested
+    cancel_requested = True
+    log.info("Cancel requested by user")
+    return {"status": "cancelling"}
 
 
 # ---------------------------------------------------------------------------

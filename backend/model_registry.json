@@ -276,11 +276,11 @@
         {
           "id": "realistic-vision-v6",
           "name": "Realistic Vision V6.0",
-          "filename": "realisticVision_v60B1.safetensors",
+          "filename": "Realistic_Vision_V6.0_NV_B1_fp16.safetensors",
           "size_gb": 2.13,
-          "download_url": null,
+          "download_url": "https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE/resolve/main/Realistic_Vision_V6.0_NV_B1_fp16.safetensors",
           "source_url": "https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE",
-          "description": "Best photorealism model for SD 1.5. Download from HuggingFace or Civitai.",
+          "description": "Best photorealism model for SD 1.5. FP16 variant (2.13 GB).",
           "default_steps": 25,
           "default_guidance": 7.0,
           "license": "CreativeML Open RAIL-M"
